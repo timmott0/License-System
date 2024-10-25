@@ -1,7 +1,8 @@
 from PyQt5.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
                            QLabel, QLineEdit, QComboBox, QDateEdit, QPushButton,
                            QScrollArea, QWidget, QGroupBox, QTableWidget, QTableWidgetItem,
-                           QDialog, QTextEdit, QMessageBox, QStackedWidget, QFormLayout, QSpinBox)
+                           QDialog, QTextEdit, QMessageBox, QStackedWidget, QFormLayout, QSpinBox,
+                           QFileDialog)
 from PyQt5.QtCore import Qt, QDate
 from .dialogs.platform_select import PlatformSelectDialog
 from .dialogs.product_dialog import ProductDialog
@@ -76,8 +77,9 @@ class HASPGenerator(BaseLicenseGenerator):
 # Add other generator implementations...
 
 class LicenseFrame(QFrame):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, config=None):
         super().__init__(parent)
+        self.config = config
         self.setup_ui()
         
     def setup_ui(self):
@@ -178,25 +180,33 @@ class LicenseFrame(QFrame):
         
         # Add license system selection
         layout.addWidget(QLabel("License System:"), 4, 0)
-        self.license_system = QComboBox()
+        self.license_system_combo = QComboBox()
+        self.license_system_combo.setObjectName("license_system_combo")
         
-        # Get enabled systems from config instead of file
-        config = self.parent().config
-        enabled_systems = [
-            system['name']
-            for system in config.get('license_systems', {}).values()
-            if system.get('enabled', True)
-        ]
+        # Populate the license systems dropdown using local config
+        if self.config:
+            license_systems = self.config.get('license_systems', {})
+            for system_id, system in license_systems.items():
+                if system.get('enabled', True):
+                    self.license_system_combo.addItem(system['name'], system_id)
         
-        self.license_system.addItems(enabled_systems)
-        self.license_system.currentTextChanged.connect(self.on_license_system_changed)
-        layout.addWidget(self.license_system, 4, 1)
+        layout.addWidget(self.license_system_combo, 4, 1)
         
         # Create stacked widget for system-specific options
         self.system_options = QStackedWidget()
-        self.system_options.addWidget(self.create_flexlm_options())
-        self.system_options.addWidget(self.create_hasp_options())
-        # Add other system option widgets...
+        
+        # Add FlexLM options
+        flexlm_widget = self.create_flexlm_options()
+        self.system_options.addWidget(flexlm_widget)
+        
+        # Add HASP options
+        hasp_widget = self.create_hasp_options()
+        self.system_options.addWidget(hasp_widget)
+        
+        # Connect the signal after adding widgets
+        self.license_system_combo.currentIndexChanged.connect(self.on_license_system_changed)
+        
+        # Add stacked widget to layout
         layout.addWidget(self.system_options, 5, 0, 1, 2)
         
         group.setLayout(layout)
@@ -279,7 +289,7 @@ class LicenseFrame(QFrame):
         """Generate license based on selected system"""
         try:
             # Get selected license type
-            license_type = LicenseType(self.license_system.currentText())
+            license_type = LicenseType(self.license_system_combo.currentText())
             
             # Get system-specific options
             system_options = self.get_system_options(license_type)
@@ -466,15 +476,22 @@ class LicenseFrame(QFrame):
         
         return widget
     
-    def on_license_system_changed(self, system_name):
+    def on_license_system_changed(self, index):
         """Handle license system selection change"""
-        # Show appropriate options widget
-        index = list(LicenseType).index(LicenseType(system_name))
-        self.system_options.setCurrentIndex(index)
-        
-        # Update other UI elements based on selection
-        self.update_ui_for_license_system(system_name)
-    
+        system_id = self.license_system_combo.currentData()
+        if system_id:
+            system = self.config['license_systems'][system_id]
+            # Update port
+            self.flexlm_port.setValue(system['default_port'])  # Correct attribute
+            # Update other fields based on selected system
+            if system_id == 'flexlm':
+                self.flexlm_vendor.setText('fe')
+                self.flexlm_options.setText('ewew')
+            elif system_id == 'sentinel':
+                self.hasp_vendor_code.setText('hasp')
+                self.hasp_feature_id.setValue(1)
+            # Add other systems if necessary
+
     def save_license(self, license_data: str, license_type: LicenseType):
         """Save the license file with the appropriate extension"""
         file_path, _ = QFileDialog.getSaveFileName(
@@ -492,6 +509,34 @@ class LicenseFrame(QFrame):
                 "Success",
                 f"License file saved successfully as {file_path}"
             )
+
+    def setup_license_system_dropdown(self):
+        """Populate the license system dropdown"""
+        self.license_system_combo.clear()
+        
+        # Get license systems from config
+        license_systems = self.config.get('license_systems', {})  # Changed from self.parent().config
+        
+        # Add enabled systems to dropdown
+        for system_id, system in license_systems.items():
+            if system.get('enabled', True):  # Only add enabled systems
+                self.license_system_combo.addItem(system['name'], system_id)
+                
+        # Connect signal to handle selection changes
+        self.license_system_combo.currentIndexChanged.connect(self.on_license_system_changed)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

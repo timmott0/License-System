@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
         self.layout.setSpacing(20)  # Space between widgets
         
         # Create license frame and add it to the layout
-        self.license_frame = LicenseFrame(self)
+        self.license_frame = LicenseFrame(self, config=self.config)  # Pass config here
         self.layout.addWidget(self.license_frame)
         #TODO: Add the eval frame to the layout
         self.create_menu_bar()

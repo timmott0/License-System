@@ -126,4 +126,4 @@ class FloatingLicenseGenerator(BaseLicenseGenerator):
         }
         return self.signer.sign_license_data(license_data)
 
-# Add other generator implementations...
+# Add other generator implementations After Matt shows me how to do it

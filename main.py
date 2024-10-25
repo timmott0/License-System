@@ -35,13 +35,22 @@ class LicenseManagementSystem:
             config_path = Path("src/config/settings.json")
             with open(config_path, 'r') as f:
                 self.config = json.load(f)
-            self.logger.info("Configuration loaded successfully")
             
-            # Remove or comment out any code that tries to load license_systems.json
-            # It might look something like this:
-            # license_systems_path = Path("config/license_systems.json")  # Remove this
-            # with open(license_systems_path, 'r') as f:                 # Remove this
-            #     self.license_systems = json.load(f)                    # Remove this
+            # Initialize license systems if not present
+            if 'license_systems' not in self.config:
+                from config.license_systems import DEFAULT_SYSTEMS
+                self.config['license_systems'] = {
+                    system_id: {
+                        "name": system.name,
+                        "enabled": system.enabled,
+                        "install_path": str(system.install_path),
+                        "default_port": system.default_port,
+                        "description": system.description
+                    }
+                    for system_id, system in DEFAULT_SYSTEMS.items()
+                }
+            
+            self.logger.info("Configuration loaded successfully")
         except FileNotFoundError:
             self.logger.error("Configuration file not found")
             self.config = {}
@@ -68,4 +77,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
