@@ -1,0 +1,43 @@
+{
+    "application": {
+        "name": "License Management System",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "config": "config",
+        "licenses": "licenses",
+        "keys": "keys",
+        "logs": "logs",
+        "license_storage": "licenses/",
+        "rsa_keys": "config/rsa_keys/",
+        "backup": "backup/"
+    },
+    "defaults": {
+        "license_type": "node_locked",
+        "validity_period": 365,
+        "maintenance_period": 90
+    },
+    "ui": {
+        "window_width": 1024,
+        "window_height": 768,
+        "theme": "default"
+    },
+    "license_systems": {
+        "flexlm": {
+            "name": "FlexLM",
+            "enabled": true
+        },
+        "hasp": {
+            "name": "Sentinel HASP",
+            "enabled": true
+        },
+        "floating": {
+            "name": "Floating License",
+            "enabled": true
+        },
+        "nodelock": {
+            "name": "Node Locked",
+            "enabled": true
+        }
+    }
+}

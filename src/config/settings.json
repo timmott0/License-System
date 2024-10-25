@@ -1,0 +1,11 @@
+{
+    "paths": {
+        "license_storage": "licenses/",
+        "rsa_keys": "config/rsa_keys/",
+        "backup": "backup/",
+        "config": "config",
+        "licenses": "licenses",
+        "keys": "keys",
+        "logs": "logs"
+    }
+}
