@@ -16,7 +16,7 @@ class RevocationManager:
         """
         Initialize the revocation manager
         Args:
-            db_path: Path to the SQLite database file
+            db_path: Path to the SQLite or repository database file (should be in the license_server_data folder)
         """
         self.db_path = db_path
         self.init_db()
