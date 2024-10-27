@@ -14,11 +14,14 @@ from encryption.license_signing import LicenseSigner
 logger = logging.getLogger(__name__)
 
 class LicenseType(Enum):
-    FLEXLM = "FlexLM"
-    HASP = "Sentinel HASP"
-    LICENSESERVER = "Custom License Server"
-    NODELOCK = "Node Locked"
+    SINGLE_USER = "Single-User License"
+    VOLUME = "Volume License"
+    SUBSCRIPTION = "Subscription License"
+    TRIAL = "Trial License"
+    FREEMIUM = "Freemium License"
     FLOATING = "Floating License"
+    CONCURRENT = "Concurrent License"
+    NODELOCK = "Node-Locked License"
 
 class LicenseGeneratorFactory:
     """Factory to create appropriate license generator based on type"""

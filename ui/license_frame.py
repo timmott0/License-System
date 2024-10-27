@@ -16,13 +16,19 @@ from utils.validation import LicenseValidator
 from utils.host_identifier import HostIdentifier
 from typing import List, Tuple, Dict
 from enum import Enum
+from .dialogs.floating_license_dialog import FloatingLicenseDialog
+from .dialogs.credentials_dialog import CredentialsDialog
+from security.credentials_manager import CredentialsManager
 
 class LicenseType(Enum):
-    FLEXLM = "FlexLM"
-    HASP = "Sentinel HASP"
-    LICENSESERVER = "Custom License Server"
-    NODELOCK = "Node Locked"
+    SINGLE_USER = "Single-User License"
+    VOLUME = "Volume License"
+    SUBSCRIPTION = "Subscription License"
+    TRIAL = "Trial License"
+    FREEMIUM = "Freemium License"
     FLOATING = "Floating License"
+    CONCURRENT = "Concurrent License"
+    NODELOCK = "Node-Locked License"
 
 class BaseLicenseGenerator:
     """Base class for all license generators"""
@@ -80,6 +86,8 @@ class LicenseFrame(QFrame):
     def __init__(self, parent=None, config=None):
         super().__init__(parent)
         self.config = config
+        self.floating_license_config = None  # Store floating license settings
+        self.credentials_manager = CredentialsManager()
         self.setup_ui()
         
     def setup_ui(self):
@@ -123,6 +131,15 @@ class LicenseFrame(QFrame):
         
         main_layout.addLayout(button_layout)
         
+        # REMOVE these lines that create duplicate dropdowns
+        # self.form_layout = QFormLayout()
+        # self.license_type_combo = QComboBox()
+        # for license_type in LicenseType:
+        #     self.license_type_combo.addItem(license_type.value, license_type)
+        # self.license_type_combo.currentIndexChanged.connect(self.on_license_type_changed)
+        # self.form_layout.addRow("License Type:", self.license_type_combo)
+        # main_layout.addLayout(self.form_layout)
+
     def create_customer_group(self):
         """Create the customer information group"""
         group = QGroupBox("Customer Information")
@@ -151,12 +168,13 @@ class LicenseFrame(QFrame):
         group = QGroupBox("License Settings")
         layout = QGridLayout()
         
-        # License Type
+        # License Type dropdown with correct license types
         layout.addWidget(QLabel("License Type:"), 0, 0)
-        self.license_type = QComboBox()
-        self.license_type.addItems(["Node Locked", "Server Based", "Redundant"])
-        self.license_type.currentTextChanged.connect(self.on_license_type_changed)
-        layout.addWidget(self.license_type, 0, 1)
+        self.license_type_combo = QComboBox()
+        for license_type in LicenseType:
+            self.license_type_combo.addItem(license_type.value, license_type)
+        self.license_type_combo.currentTextChanged.connect(self.on_license_type_changed)
+        layout.addWidget(self.license_type_combo, 0, 1)
         
         # Platform
         layout.addWidget(QLabel("Platform:"), 1, 0)
@@ -178,36 +196,15 @@ class LicenseFrame(QFrame):
         self.maintenance_date.setDate(QDate.currentDate().addMonths(3))
         layout.addWidget(self.maintenance_date, 3, 1)
         
-        # Add license system selection
+        # License System (FlexLM, HASP, etc.)
         layout.addWidget(QLabel("License System:"), 4, 0)
         self.license_system_combo = QComboBox()
-        self.license_system_combo.setObjectName("license_system_combo")
-        
-        # Populate the license systems dropdown using local config
         if self.config:
             license_systems = self.config.get('license_systems', {})
             for system_id, system in license_systems.items():
                 if system.get('enabled', True):
                     self.license_system_combo.addItem(system['name'], system_id)
-        
         layout.addWidget(self.license_system_combo, 4, 1)
-        
-        # Create stacked widget for system-specific options
-        self.system_options = QStackedWidget()
-        
-        # Add FlexLM options
-        flexlm_widget = self.create_flexlm_options()
-        self.system_options.addWidget(flexlm_widget)
-        
-        # Add HASP options
-        hasp_widget = self.create_hasp_options()
-        self.system_options.addWidget(hasp_widget)
-        
-        # Connect the signal after adding widgets
-        self.license_system_combo.currentIndexChanged.connect(self.on_license_system_changed)
-        
-        # Add stacked widget to layout
-        layout.addWidget(self.system_options, 5, 0, 1, 2)
         
         group.setLayout(layout)
         return group
@@ -243,7 +240,7 @@ class LicenseFrame(QFrame):
         group.setLayout(layout)
         return group
         
-    def on_license_type_changed(self, license_type):
+    def on_license_type_changed(self, index):
         """Handle license type changes"""
         # Update UI based on license type
         pass
@@ -341,7 +338,7 @@ class LicenseFrame(QFrame):
             }
             
             license_info = {
-                'type': self.license_type.currentText(),
+                'type': self.license_type_combo.currentText(),
                 'expiration_date': self.expiration_date.date().toPyDate().isoformat(),
                 'maintenance_date': self.maintenance_date.date().toPyDate().isoformat(),
                 'platforms': self.selected_platforms
@@ -524,6 +521,101 @@ class LicenseFrame(QFrame):
                 
         # Connect signal to handle selection changes
         self.license_system_combo.currentIndexChanged.connect(self.on_license_system_changed)
+
+    def clear_fields(self):
+        """Clear all input fields"""
+        for widget in self.findChildren(QLineEdit):
+            widget.clear()
+        for widget in self.findChildren(QTextEdit):
+            widget.clear()
+        for widget in self.findChildren(QComboBox):
+            widget.setCurrentIndex(0)
+
+    def set_default_values(self):
+        """Set default values for new license"""
+        # Add any default values you want to set
+        # For example:
+        # self.expiry_date.setDate(QDate.currentDate().addYears(1))
+        # self.status_combo.setCurrentText("Active")
+        pass
+
+    def load_data(self, data: dict):
+        """Load license data into the form"""
+        # Implement loading data into your form fields
+        # Example:
+        # self.name_input.setText(data.get('name', ''))
+        # self.expiry_date.setDate(QDate.fromString(data.get('expiry', '')))
+        pass
+
+    def get_data(self) -> dict:
+        """Get license data from the form"""
+        # Implement collecting data from your form fields
+        # Example:
+        return {
+            # 'name': self.name_input.text(),
+            # 'expiry': self.expiry_date.date().toString(),
+            # Add all your fields here
+        }
+
+    def setup_license_type_combo(self):
+        self.license_type_combo = QComboBox()
+        for license_type in LicenseType:
+            self.license_type_combo.addItem(license_type.value, license_type)
+        self.license_type_combo.currentIndexChanged.connect(self.on_license_type_changed)
+
+    def on_license_type_changed(self, index):
+        """Handle license type selection changes"""
+        license_type = self.license_type_combo.currentData()  # Now using consistent name
+        
+        if license_type == LicenseType.FLOATING:
+            dialog = FloatingLicenseDialog(self)
+            if dialog.exec_():
+                self.floating_license_config = dialog.get_values()
+                print(f"Floating license configured with {self.floating_license_config}")
+    
+    def get_license_data(self):
+        data = {
+            'type': self.license_type_combo.currentData(),
+            # ... other existing fields ...
+        }
+        
+        # Add floating license specific data if applicable
+        if data['type'] == LicenseType.FLOATING:
+            data.update(self.floating_license_config)
+        
+        return data
+
+    def validate_server_path(self, server_path: str):
+        """Validate server path and request credentials if needed"""
+        # Check if we have credentials for this path
+        credentials = self.credentials_manager.get_credentials(server_path)
+        
+        if not credentials:
+            # Show credentials dialog
+            dialog = CredentialsDialog(server_path, self)
+            if dialog.exec_() == QDialog.Accepted:
+                credentials = dialog.get_credentials()
+                # Save the credentials
+                self.credentials_manager.save_credentials(
+                    server_path,
+                    credentials['username'],
+                    credentials['password']
+                )
+                return True
+            return False
+        return True
+
+    def on_server_path_changed(self, path: str):
+        """Handle server path changes"""
+        if path.startswith(('\\\\', 'http://', 'https://')):
+            if not self.validate_server_path(path):
+                QMessageBox.warning(
+                    self,
+                    "Credentials Required",
+                    "Valid credentials are required for server access."
+                )
+
+
 
 
 

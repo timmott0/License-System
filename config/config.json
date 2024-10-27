@@ -1,0 +1,25 @@
+{
+    "license_systems": {
+        "flexlm": {
+            "name": "FlexLM",
+            "enabled": true,
+            "install_path": "vendor\\flexlm",
+            "default_port": 27000,
+            "description": "Flexible License Manager by Flexera"
+        },
+        "hasp": {
+            "name": "Sentinel HASP",
+            "enabled": true,
+            "install_path": "vendor\\hasp",
+            "default_port": 1947,
+            "description": "Hardware-based licensing by Thales"
+        },
+        "custom": {
+            "name": "Custom License Server",
+            "enabled": true,
+            "install_path": "vendor\\custom",
+            "default_port": 8080,
+            "description": "Custom implementation of license server"
+        }
+    }
+}

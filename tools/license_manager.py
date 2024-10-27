@@ -10,6 +10,152 @@ from core.revocation_manager import RevocationManager
 from core.usage_tracker import UsageTracker
 import logging
 import yaml
+from enum import Enum
+from typing import Dict, Any
+
+class LicenseType(Enum):
+    SINGLE_USER = "Single-User License"
+    VOLUME = "Volume License"
+    SUBSCRIPTION = "Subscription License"
+    TRIAL = "Trial License"
+    FREEMIUM = "Freemium License"
+    FLOATING = "Floating License"
+    CONCURRENT = "Concurrent License"
+    NODELOCK = "Node-Locked License"
+
+class LicenseManager:
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.logger = logging.getLogger(__name__)
+
+    def generate_license(self, license_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate license based on type"""
+        license_type = LicenseType(license_data.get('license_type'))
+        
+        # Common license attributes
+        base_license = {
+            'customer_id': license_data.get('customer_id'),
+            'customer_name': license_data.get('customer_name'),
+            'issue_date': datetime.now().isoformat(),
+            'license_type': license_type.value,
+            'license_system': license_data.get('license_system')
+        }
+
+        # Type-specific handling
+        if license_type == LicenseType.SINGLE_USER:
+            return self._handle_single_user_license(base_license, license_data)
+            
+        elif license_type == LicenseType.VOLUME:
+            return self._handle_volume_license(base_license, license_data)
+            
+        elif license_type == LicenseType.SUBSCRIPTION:
+            return self._handle_subscription_license(base_license, license_data)
+            
+        elif license_type == LicenseType.TRIAL:
+            return self._handle_trial_license(base_license, license_data)
+            
+        elif license_type == LicenseType.FREEMIUM:
+            return self._handle_freemium_license(base_license, license_data)
+            
+        elif license_type == LicenseType.FLOATING:
+            return self._handle_floating_license(base_license, license_data)
+            
+        elif license_type == LicenseType.CONCURRENT:
+            return self._handle_concurrent_license(base_license, license_data)
+            
+        elif license_type == LicenseType.NODELOCK:
+            return self._handle_nodelock_license(base_license, license_data)
+        
+        else:
+            raise ValueError(f"Unsupported license type: {license_type}")
+
+    def _handle_single_user_license(self, base_license: Dict, license_data: Dict) -> Dict:
+        """Handle Single User License specifics"""
+        base_license.update({
+            'max_users': 1,
+            'expiration_date': license_data.get('expiration_date'),
+            'features': license_data.get('features', []),
+            'hardware_id': license_data.get('hardware_id')
+        })
+        return base_license
+
+    def _handle_volume_license(self, base_license: Dict, license_data: Dict) -> Dict:
+        """Handle Volume License specifics"""
+        base_license.update({
+            'max_users': license_data.get('number_of_licenses', 1),
+            'expiration_date': license_data.get('expiration_date'),
+            'features': license_data.get('features', []),
+            'deployment_type': license_data.get('deployment_type', 'enterprise')
+        })
+        return base_license
+
+    def _handle_subscription_license(self, base_license: Dict, license_data: Dict) -> Dict:
+        """Handle Subscription License specifics"""
+        base_license.update({
+            'subscription_start': license_data.get('start_date'),
+            'subscription_end': license_data.get('expiration_date'),
+            'renewal_type': license_data.get('renewal_type', 'auto'),
+            'features': license_data.get('features', []),
+            'tier': license_data.get('subscription_tier', 'basic')
+        })
+        return base_license
+
+    def _handle_trial_license(self, base_license: Dict, license_data: Dict) -> Dict:
+        """Handle Trial License specifics"""
+        # Default trial period is 30 days if not specified
+        trial_days = license_data.get('trial_days', 30)
+        expiration = datetime.now() + timedelta(days=trial_days)
+        
+        base_license.update({
+            'trial_start': datetime.now().isoformat(),
+            'trial_end': expiration.isoformat(),
+            'features': license_data.get('features', []),
+            'conversion_path': license_data.get('conversion_path', 'standard')
+        })
+        return base_license
+
+    def _handle_freemium_license(self, base_license: Dict, license_data: Dict) -> Dict:
+        """Handle Freemium License specifics"""
+        base_license.update({
+            'free_features': license_data.get('free_features', []),
+            'premium_features': license_data.get('premium_features', []),
+            'usage_limits': license_data.get('usage_limits', {}),
+            'upgrade_path': license_data.get('upgrade_path', 'premium')
+        })
+        return base_license
+
+    def _handle_floating_license(self, base_license: Dict, license_data: Dict) -> Dict:
+        """Handle Floating License specifics"""
+        base_license.update({
+            'concurrent_users': license_data.get('concurrent_users', 1),
+            'server_url': license_data.get('server_url'),
+            'checkout_duration': license_data.get('checkout_duration', '24h'),
+            'features': license_data.get('features', []),
+            'expiration_date': license_data.get('expiration_date')
+        })
+        return base_license
+
+    def _handle_concurrent_license(self, base_license: Dict, license_data: Dict) -> Dict:
+        """Handle Concurrent License specifics"""
+        base_license.update({
+            'max_concurrent_users': license_data.get('max_concurrent_users', 1),
+            'session_timeout': license_data.get('session_timeout', '1h'),
+            'features': license_data.get('features', []),
+            'expiration_date': license_data.get('expiration_date'),
+            'overage_policy': license_data.get('overage_policy', 'strict')
+        })
+        return base_license
+
+    def _handle_nodelock_license(self, base_license: Dict, license_data: Dict) -> Dict:
+        """Handle Node-Locked License specifics"""
+        base_license.update({
+            'hardware_id': license_data.get('hardware_id'),
+            'machine_fingerprint': license_data.get('machine_fingerprint'),
+            'features': license_data.get('features', []),
+            'expiration_date': license_data.get('expiration_date'),
+            'backup_allowed': license_data.get('backup_allowed', False)
+        })
+        return base_license
 
 def setup_logging(log_file: str):
     """

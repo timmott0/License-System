@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
-                           QMenuBar, QMenu, QAction, QMessageBox, QDialog)
+                           QMenuBar, QMenu, QAction, QMessageBox, QDialog, QFileDialog)
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFont
 from .license_frame import LicenseFrame
@@ -8,6 +8,7 @@ from .dialogs.common_settings import CommonSettingsDialog
 from pathlib import Path
 import json
 from .dialogs.license_systems_dialog import LicenseSystemsDialog
+from core.license_generator import LicenseType
 
 class MainWindow(QMainWindow):
     def __init__(self, config, parent=None):
@@ -220,23 +221,70 @@ class MainWindow(QMainWindow):
 
     def new_license(self):
         """Create a new license"""
-        # TODO: Implement new license creation
-        pass
+        # Clear all fields in the license frame
+        self.license_frame.clear_fields()
+        
+        # Optionally set default values if needed
+        self.license_frame.set_default_values()
 
     def open_license(self):
         """Open an existing license"""
-        # TODO: Implement license opening
-        pass
+        from PyQt5.QtWidgets import QFileDialog
+        
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open License File",
+            "",
+            "License Files (*.json);;All Files (*)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'r') as file:
+                    license_data = json.load(file)
+                    self.license_frame.load_data(license_data)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to open license: {str(e)}")
 
     def save_license(self):
         """Save the current license"""
-        # TODO: Implement license saving
-        pass
+        from PyQt5.QtWidgets import QFileDialog
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save License File",
+            "",
+            "License Files (*.json);;All Files (*)"
+        )
+        
+        if file_path:
+            try:
+                license_data = self.license_frame.get_data()
+                with open(file_path, 'w') as file:
+                    json.dump(license_data, file, indent=4)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to save license: {str(e)}")
 
     def show_settings(self):
         """Show the settings dialog"""
         dialog = CommonSettingsDialog(self.config, self)
-        dialog.exec_()
+        if dialog.exec_():
+            # Save the updated config
+            try:
+                config_path = Path(self.config['paths']['config']) / 'config.json'
+                with open(config_path, 'w') as f:
+                    json.dump(self.config, f, indent=4)
+                QMessageBox.information(
+                    self,
+                    "Settings Saved",
+                    "Settings have been saved successfully."
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Failed to save settings: {str(e)}"
+                )
 
     def show_about(self):
         """Show the about dialog"""
@@ -284,3 +332,5 @@ class MainWindow(QMainWindow):
                 "Warning",
                 f"Could not open license systems configuration: {str(e)}"
             )
+
+

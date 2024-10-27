@@ -73,3 +73,29 @@ class HASPInstaller(BaseLicenseInstaller):
             return True, "HASP license installed successfully"
         except Exception as e:
             return False, f"HASP installation failed: {str(e)}"
+
+class CustomServerInstaller(BaseLicenseInstaller):
+    def install(self, license_path: Path, options: Dict) -> Tuple[bool, str]:
+        try:
+            # Implement custom license server installation logic
+            # copy the license file to the server directory
+            server_path = Path("/opt/custom_license_server/licenses")
+            server_path.mkdir(parents=True, exist_ok=True)
+            dest_path = server_path / license_path.name
+            shutil.copy2(license_path, dest_path)
+            
+            # Configure server settings if needed
+            # Modify a config file or set environment variables
+            
+            # Restart the custom license server service
+            subprocess.run(['systemctl', 'restart', 'custom_license_server'])
+            
+            return True, f"Custom License Server installed at {dest_path}"
+        except Exception as e:
+            return False, f"Custom License Server installation failed: {str(e)}"
+
+    def verify_installation(self, license_path: Path) -> bool:
+        # Implement verification logic to ensure the installation was successful
+        # Check if the license file exists and the service is running
+        server_path = Path("/opt/custom_license_server/licenses") / license_path.name
+        return server_path.exists()

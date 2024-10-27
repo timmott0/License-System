@@ -2,6 +2,7 @@ import sys
 import logging
 from pathlib import Path
 import json
+import os
 from PyQt5.QtWidgets import QApplication
 
 # Local imports
@@ -10,6 +11,8 @@ from utils.file_operations import ensure_directory_exists
 
 class LicenseManagementSystem:
     def __init__(self):
+        # Initialize config file path
+        self.config_file = Path("config/config.json")
         self.setup_logging()
         self.load_config()
         
@@ -30,11 +33,16 @@ class LicenseManagementSystem:
         self.logger.info("License Management System starting...")
 
     def load_config(self):
-        """Load application configuration from config files"""
+        """Load configuration from file or initialize defaults"""
         try:
-            config_path = Path("src/config/settings.json")
-            with open(config_path, 'r') as f:
-                self.config = json.load(f)
+            # Ensure config directory exists
+            ensure_directory_exists(self.config_file.parent)
+            
+            if self.config_file.exists():
+                with open(self.config_file, 'r') as f:
+                    self.config = json.load(f)
+            else:
+                self.config = {}
             
             # Initialize license systems if not present
             if 'license_systems' not in self.config:
@@ -49,14 +57,16 @@ class LicenseManagementSystem:
                     }
                     for system_id, system in DEFAULT_SYSTEMS.items()
                 }
+                
+                # Save the initial configuration
+                with open(self.config_file, 'w') as f:
+                    json.dump(self.config, f, indent=4)
             
             self.logger.info("Configuration loaded successfully")
-        except FileNotFoundError:
-            self.logger.error("Configuration file not found")
-            self.config = {}
-        except json.JSONDecodeError:
-            self.logger.error("Invalid configuration file format")
-            self.config = {}
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load configuration: {str(e)}")
+            raise
 
     def run(self):
         """Initialize and run the application"""
