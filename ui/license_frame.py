@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
                            QLabel, QLineEdit, QComboBox, QDateEdit, QPushButton,
-                           QScrollArea, QWidget, QGroupBox, QTableWidget, QTableWidgetItem,
+                           QScrollArea, QWidget, QGroupBox, QCheckBox, QTableWidgetItem,
                            QDialog, QTextEdit, QMessageBox, QStackedWidget, QFormLayout, QSpinBox,
                            QFileDialog)
 from PyQt5.QtCore import Qt, QDate
@@ -248,32 +248,21 @@ class LicenseFrame(QFrame):
         
     def create_product_group(self):
         """Create the product settings group"""
-        group = QGroupBox("Product Settings")
+        group = QGroupBox("Product Selection")
         layout = QVBoxLayout()
         
-        # Product Table
-        self.product_table = QTableWidget(0, 4)
-        self.product_table.setHorizontalHeaderLabels(
-            ["Product Name", "Version", "Quantity", "Features"]
-        )
-        layout.addWidget(self.product_table)
+        # Create a scrollable area for product checkboxes
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
         
-        # Buttons
-        button_layout = QHBoxLayout()
+        # Container for checkboxes
+        self.product_container = QWidget()
+        self.product_layout = QVBoxLayout(self.product_container)
         
-        add_product_btn = QPushButton("Add Product")
-        add_product_btn.clicked.connect(self.add_product)
-        button_layout.addWidget(add_product_btn)
+        scroll.setWidget(self.product_container)
+        layout.addWidget(scroll)
         
-        edit_product_btn = QPushButton("Edit Product")
-        edit_product_btn.clicked.connect(self.edit_product)
-        button_layout.addWidget(edit_product_btn)
-        
-        remove_product_btn = QPushButton("Remove Product")
-        remove_product_btn.clicked.connect(self.remove_product)
-        button_layout.addWidget(remove_product_btn)
-        
-        layout.addLayout(button_layout)
         group.setLayout(layout)
         return group
         
@@ -315,7 +304,7 @@ class LicenseFrame(QFrame):
             errors.append(date_error)
         
         # Validate products
-        if self.product_table.rowCount() == 0:
+        if self.product_container.layout().count() == 0:
             errors.append("At least one product is required")
         
         # Validate platform selection
@@ -880,14 +869,38 @@ class LicenseFrame(QFrame):
         }
 
     def refresh_product_list(self):
-        """Refresh the product table after changes"""
-        # Clear existing rows
-        self.product_table.setRowCount(0)
+        """Refresh the product checkboxes after changes"""
+        # Clear existing checkboxes
+        while self.product_layout.count():
+            item = self.product_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
         
         # Load products from config
         products = self.config.get('products', [])
         
-        # Add each product to the table
+        # Add checkbox for each product
         for product_data in products:
             product = Product(**product_data)
-            self.add_product_to_table(product)
+            checkbox = QCheckBox(f"{product.name} (v{product.version})")
+            checkbox.setProperty('product_data', product_data)  # Store product data
+            self.product_layout.addWidget(checkbox)
+        
+        # Add stretch at the end to keep checkboxes at top
+        self.product_layout.addStretch()
+
+    def get_selected_products(self) -> List[Product]:
+        """Get list of selected products"""
+        selected_products = []
+        for i in range(self.product_layout.count()):
+            item = self.product_layout.itemAt(i)
+            if item and item.widget():
+                checkbox = item.widget()
+                if isinstance(checkbox, QCheckBox) and checkbox.isChecked():
+                    product_data = checkbox.property('product_data')
+                    selected_products.append(Product(**product_data))
+        return selected_products
+
+    def get_products(self) -> List[Product]:
+        """Get selected products for the license"""
+        return self.get_selected_products()
