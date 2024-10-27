@@ -10,6 +10,7 @@ import json
 from .dialogs.license_systems_dialog import LicenseSystemsDialog
 from core.license_generator import LicenseType
 from .dialogs.server_sync_dialog import ServerSyncDialog  # Add this import
+from .dialogs.user_guide import UserGuideDialog
 
 class MainWindow(QMainWindow):
     def __init__(self, config, parent=None):
@@ -224,10 +225,22 @@ class MainWindow(QMainWindow):
         license_systems_action.triggered.connect(self.show_license_systems)
         tools_menu.addAction(license_systems_action)
         
+        # Add Key Management to Tools menu
+        key_management_action = QAction('&Key Management...', self)
+        key_management_action.triggered.connect(self.show_key_management)
+        tools_menu.addAction(key_management_action)
+        
         # Help Menu
         help_menu = menubar.addMenu('&Help')
         
-        about_action = QAction('&About', self)
+        # User Guide
+        user_guide_action = QAction('User Guide', self)
+        user_guide_action.setShortcut('F1')  # Add F1 shortcut for quick access
+        user_guide_action.triggered.connect(self.show_user_guide)
+        help_menu.addAction(user_guide_action)
+        
+        # About
+        about_action = QAction('About', self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
 
@@ -388,7 +401,36 @@ class MainWindow(QMainWindow):
                 f"Failed to save products configuration: {str(e)}"
             )
 
+    def show_key_management(self):
+        """Launch the key management GUI"""
+        try:
+            import subprocess
+            import sys
+            from pathlib import Path
+            
+            # Get the path to the key management script
+            key_mgmt_path = Path(__file__).parent.parent / 'tools' / 'key_management_gui.py'
+            
+            if not key_mgmt_path.exists():
+                raise FileNotFoundError(f"Key management script not found at {key_mgmt_path}")
+            
+            # Launch the key management GUI as a separate process
+            process = subprocess.Popen([sys.executable, str(key_mgmt_path)])
+            
+            # Optional: Wait for the process to complete
+            # process.wait()
+            
+            # Refresh the license frame if needed
+            # self.license_frame.refresh_key_info()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to launch key management: {str(e)}"
+            )
 
-
-
-
+    def show_user_guide(self):
+        """Show the user guide dialog"""
+        guide = UserGuideDialog(self)
+        guide.exec_()

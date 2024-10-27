@@ -44,23 +44,19 @@ class LicenseManagementSystem:
             else:
                 self.config = {}
             
-            # Initialize license systems if not present
-            if 'license_systems' not in self.config:
-                from config.license_systems import DEFAULT_SYSTEMS
-                self.config['license_systems'] = {
-                    system_id: {
-                        "name": system.name,
-                        "enabled": system.enabled,
-                        "install_path": str(system.install_path),
-                        "default_port": system.default_port,
-                        "description": system.description
+            # Initialize paths if not present
+            if 'paths' not in self.config:
+                self.config['paths'] = {
+                    'config': 'config',
+                    'keys': {
+                        'private_key_path': 'config/keys/private_key.pem',  # Updated key names
+                        'public_key_path': 'config/keys/public_key.pem'     # Updated key names
                     }
-                    for system_id, system in DEFAULT_SYSTEMS.items()
                 }
-                
-                # Save the initial configuration
-                with open(self.config_file, 'w') as f:
-                    json.dump(self.config, f, indent=4)
+            
+            # Ensure key directory exists
+            key_dir = Path(self.config['paths'].get('keys', {}).get('private_key_path', '')).parent
+            ensure_directory_exists(key_dir)
             
             self.logger.info("Configuration loaded successfully")
             

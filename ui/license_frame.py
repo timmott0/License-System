@@ -8,7 +8,7 @@ from .dialogs.platform_select import PlatformSelectDialog
 from .dialogs.product_dialog import ProductDialog
 from core.product import Product
 from core.license_generator import LicenseGeneratorFactory
-from encryption.key_management import KeyManager
+from core.key_manager import KeyManager
 from encryption.license_signing import LicenseSigner
 from pathlib import Path
 import json
@@ -100,6 +100,15 @@ class LicenseFrame(QFrame):
         self.floating_license_config = None  # Store floating license settings
         self.credentials_manager = CredentialsManager()
         self.selected_platforms = []  # Initialize selected_platforms list
+        
+        # Initialize key management
+        key_paths = config.get('paths', {}).get('keys', {})
+        self.key_manager = KeyManager(
+            private_key_path=key_paths.get('private_key_path'),
+            public_key_path=key_paths.get('public_key_path')
+        )
+        self.signer = LicenseSigner(self.key_manager)
+        
         self.setup_ui()
         
     def setup_ui(self):
@@ -904,3 +913,9 @@ class LicenseFrame(QFrame):
     def get_products(self) -> List[Product]:
         """Get selected products for the license"""
         return self.get_selected_products()
+
+
+
+
+
+
