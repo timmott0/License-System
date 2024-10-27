@@ -1,0 +1,53 @@
+{
+    "license_systems": {
+        "flexlm": {
+            "name": "FlexLM",
+            "enabled": true,
+            "install_path": "vendor\\flexlm",
+            "default_port": 27000,
+            "description": "Flexible License Manager by Flexera"
+        },
+        "hasp": {
+            "name": "Sentinel HASP",
+            "enabled": true,
+            "install_path": "vendor\\hasp",
+            "default_port": 1947,
+            "description": "Hardware-based licensing by Thales"
+        },
+        "custom": {
+            "name": "Custom License Server",
+            "enabled": true,
+            "install_path": "vendor\\custom",
+            "default_port": 8080,
+            "description": "Custom implementation of license server"
+        }
+    },
+    "paths": {
+        "config": "src/config",
+        "default_save": "C:/Users/timot/MLK-python/src/customers/Tim/35433",
+        "customer_base": "customers"
+    },
+    "products": [
+        {
+            "name": "tgruh",
+            "version": "1.3",
+            "features": [],
+            "quantity": 1
+        }
+    ],
+    "server": {
+        "host": "",
+        "port": 27000
+    },
+    "backup_server": {
+        "host": "",
+        "port": 27000
+    },
+    "connection": {
+        "timeout": 30,
+        "max_retries": 3,
+        "use_ssl": true,
+        "verify_ssl": true,
+        "cert_path": ""
+    }
+}

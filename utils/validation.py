@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 import json
@@ -19,13 +19,19 @@ class LicenseValidator:
         return True, ""
 
     @staticmethod
-    def validate_dates(expiration: datetime, maintenance: datetime) -> Tuple[bool, str]:
+    def validate_dates(expiration_date: date, maintenance_date: date) -> Tuple[bool, str]:
         """Validate license dates"""
-        now = datetime.now()
-        if expiration < now:
+        today = date.today()
+        
+        if expiration_date < today:
             return False, "Expiration date cannot be in the past"
-        if maintenance > expiration:
-            return False, "Maintenance date cannot be after expiration"
+            
+        if maintenance_date < today:
+            return False, "Maintenance date cannot be in the past"
+            
+        if maintenance_date > expiration_date:
+            return False, "Maintenance date cannot be after expiration date"
+            
         return True, ""
 
     @staticmethod
@@ -43,13 +49,16 @@ class LicenseValidator:
     def validate_customer_info(customer_info: Dict) -> List[str]:
         """Validate customer information"""
         errors = []
+        
         if not customer_info.get('name'):
             errors.append("Customer name is required")
+            
         if not customer_info.get('id'):
             errors.append("Customer ID is required")
-        valid_email, email_error = LicenseValidator.validate_email(customer_info.get('email', ''))
-        if not valid_email:
-            errors.append(email_error)
+            
+        if not customer_info.get('email'):
+            errors.append("Contact email is required")
+            
         return errors
 
 class LicenseVerifier:

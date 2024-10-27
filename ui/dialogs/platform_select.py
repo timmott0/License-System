@@ -1,10 +1,11 @@
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, 
-                           QListWidget, QPushButton, QLabel)
+                           QListWidget, QPushButton, QListWidgetItem)
+from PyQt5.QtCore import Qt
 
 class PlatformSelectDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, current_platforms=None, parent=None):
         super().__init__(parent)
-        self.selected_platforms = set()
+        self.current_platforms = current_platforms or []
         self.setup_ui()
         
     def setup_ui(self):
@@ -14,64 +15,32 @@ class PlatformSelectDialog(QDialog):
         
         layout = QVBoxLayout(self)
         
-        # Instructions
-        layout.addWidget(QLabel("Select target platforms for the license:"))
-        
-        # Platform List
+        # Platform list
         self.platform_list = QListWidget()
         self.platform_list.setSelectionMode(QListWidget.MultiSelection)
         
         # Add common platforms
-        platforms = [
-            "Windows x86",
-            "Windows x64",
-            "Linux x86",
-            "Linux x64",
-            "macOS x64",
-            "macOS ARM64",
-            "AIX",
-            "Solaris SPARC",
-            "Solaris x86"
-        ]
-        
+        platforms = ["Windows", "Linux", "macOS", "Android", "iOS"]
         for platform in platforms:
-            self.platform_list.addItem(platform)
-            
+            item = QListWidgetItem(platform)
+            self.platform_list.addItem(item)
+            # Pre-select current platforms
+            if platform in self.current_platforms:
+                item.setSelected(True)
+                
         layout.addWidget(self.platform_list)
         
         # Buttons
         button_layout = QHBoxLayout()
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
         
-        select_all_btn = QPushButton("Select All")
-        select_all_btn.clicked.connect(self.select_all)
-        button_layout.addWidget(select_all_btn)
-        
-        clear_btn = QPushButton("Clear")
-        clear_btn.clicked.connect(self.clear_selection)
-        button_layout.addWidget(clear_btn)
-        
-        button_layout.addStretch()
-        
-        ok_btn = QPushButton("OK")
-        ok_btn.clicked.connect(self.accept)
-        button_layout.addWidget(ok_btn)
-        
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_btn)
-        
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
         layout.addLayout(button_layout)
         
-    def select_all(self):
-        """Select all platforms"""
-        for i in range(self.platform_list.count()):
-            self.platform_list.item(i).setSelected(True)
-            
-    def clear_selection(self):
-        """Clear all selections"""
-        for i in range(self.platform_list.count()):
-            self.platform_list.item(i).setSelected(False)
-            
     def get_selected_platforms(self):
-        """Get list of selected platforms"""
+        """Return list of selected platforms"""
         return [item.text() for item in self.platform_list.selectedItems()]

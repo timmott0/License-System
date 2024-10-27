@@ -9,6 +9,7 @@ from pathlib import Path
 import json
 from .dialogs.license_systems_dialog import LicenseSystemsDialog
 from core.license_generator import LicenseType
+from .dialogs.server_sync_dialog import ServerSyncDialog  # Add this import
 
 class MainWindow(QMainWindow):
     def __init__(self, config, parent=None):
@@ -200,6 +201,17 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
+        # Products Menu
+        products_menu = menubar.addMenu('&Products')
+        
+        manage_products_action = QAction('&Manage Products...', self)
+        manage_products_action.triggered.connect(self.show_product_manager)
+        products_menu.addAction(manage_products_action)
+        
+        sync_products_action = QAction('&Sync Products...', self)
+        sync_products_action.triggered.connect(self.sync_products)
+        products_menu.addAction(sync_products_action)
+        
         # Tools Menu
         tools_menu = menubar.addMenu('&Tools')
         
@@ -332,5 +344,51 @@ class MainWindow(QMainWindow):
                 "Warning",
                 f"Could not open license systems configuration: {str(e)}"
             )
+
+    def show_product_manager(self):
+        """Show the product manager dialog"""
+        from .dialogs.product_manager_dialog import ProductManagerDialog
+        dialog = ProductManagerDialog(self.config, self)
+        if dialog.exec_():
+            # Save updated products to config
+            self.save_products_config()
+            # Update product dropdown in license frame
+            self.license_frame.refresh_product_list()
+
+    def sync_products(self):
+        """Synchronize products with server"""
+        try:
+            dialog = ServerSyncDialog(self.config, self)
+            if dialog.exec_():
+                # Refresh local product list after sync
+                self.load_products_from_server()
+                self.license_frame.refresh_product_list()
+                QMessageBox.information(
+                    self,
+                    "Sync Complete",
+                    "Products have been synchronized successfully."
+                )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Sync Error",
+                f"Failed to synchronize products: {str(e)}"
+            )
+
+    def save_products_config(self):
+        """Save products configuration to file"""
+        try:
+            products_file = Path(self.config['paths']['config']) / 'products.json'
+            with open(products_file, 'w') as f:
+                json.dump(self.config['products'], f, indent=4)
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to save products configuration: {str(e)}"
+            )
+
+
+
 
 

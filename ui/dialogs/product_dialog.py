@@ -136,4 +136,5 @@ class ProductDialog(QDialog):
             version=self.version_edit.text(),
             features=features,
             quantity=self.quantity_spin.value()
+            # Removed description parameter
         )

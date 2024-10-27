@@ -124,6 +124,23 @@ class CommonSettingsDialog(QDialog):
         license_group.setLayout(license_layout)
         layout.addWidget(license_group)
         
+        # Customer Directory Settings
+        customer_group = QGroupBox("Customer Directory Settings")
+        customer_layout = QFormLayout()
+        
+        self.customer_base_path = QLineEdit()
+        self.customer_base_path.setText(self.config.get('paths', {}).get('customer_base', 'customers'))
+        base_browse_btn = QPushButton("Browse...")
+        base_browse_btn.clicked.connect(self.browse_customer_base)
+        
+        base_layout = QHBoxLayout()
+        base_layout.addWidget(self.customer_base_path)
+        base_layout.addWidget(base_browse_btn)
+        customer_layout.addRow("Customer Base Directory:", base_layout)
+        
+        customer_group.setLayout(customer_layout)
+        layout.addWidget(customer_group)
+        
         widget.setLayout(layout)
         return widget
         
@@ -272,6 +289,16 @@ class CommonSettingsDialog(QDialog):
         if directory:
             self.default_save_path.setText(directory)
 
+    def browse_customer_base(self):
+        """Browse for customer base directory"""
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Customer Base Directory",
+            self.customer_base_path.text()
+        )
+        if directory:
+            self.customer_base_path.setText(directory)
+
     def accept(self):
         """Save settings when OK is clicked"""
         # Update config with new values
@@ -302,6 +329,9 @@ class CommonSettingsDialog(QDialog):
         
         # Path settings
         self.config['paths']['default_save'] = self.default_save_path.text()
+        
+        # Update customer base path
+        self.config['paths']['customer_base'] = self.customer_base_path.text()
         
         # Load existing values when dialog is created
         super().accept()

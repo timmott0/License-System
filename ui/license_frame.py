@@ -19,6 +19,8 @@ from enum import Enum
 from .dialogs.floating_license_dialog import FloatingLicenseDialog
 from .dialogs.credentials_dialog import CredentialsDialog
 from security.credentials_manager import CredentialsManager
+from utils.directory_manager import CustomerDirectoryManager
+from datetime import datetime, date
 
 class LicenseType(Enum):
     SINGLE_USER = "Single-User License"
@@ -48,14 +50,23 @@ class FlexLMGenerator(BaseLicenseGenerator):
                         products: List, host_info: Dict) -> str:
         flexlm_data = [
             f"SERVER this_host {host_info.get('hostid', 'ANY')} {license_info.get('port', '27000')}",
-            "VENDOR vendor_daemon",
+            f"VENDOR {license_info.get('vendor_daemon', 'vendor_daemon')}",
             ""
         ]
         
+        # Add license type as a comment
+        if 'license_type' in license_info:
+            flexlm_data.insert(0, f"# License Type: {license_info['license_type']}")
+        
+        # Convert expiration_date to datetime if it's a date object
+        expiration_date = license_info['expiration_date']
+        if isinstance(expiration_date, datetime.date):
+            expiration_date = datetime.datetime.combine(expiration_date, datetime.datetime.min.time())
+        
         for product in products:
             feature_line = (
-                f"FEATURE {product.name} vendor_daemon {product.version} "
-                f"{license_info['expiration_date'].strftime('%d-%b-%Y')} "
+                f"FEATURE {product.name} {license_info.get('vendor_daemon', 'vendor_daemon')} "
+                f"{product.version} {expiration_date.strftime('%d-%b-%Y')} "
                 f"{product.quantity} HOSTID={host_info.get('hostid', 'ANY')} "
                 f"VENDOR_STRING=\"{customer_info['name']}\" "
                 f"ISSUER={customer_info['id']} "
@@ -88,6 +99,7 @@ class LicenseFrame(QFrame):
         self.config = config
         self.floating_license_config = None  # Store floating license settings
         self.credentials_manager = CredentialsManager()
+        self.selected_platforms = []  # Initialize selected_platforms list
         self.setup_ui()
         
     def setup_ui(self):
@@ -141,18 +153,20 @@ class LicenseFrame(QFrame):
         # main_layout.addLayout(self.form_layout)
 
     def create_customer_group(self):
-        """Create the customer information group"""
+        """Create the customer information group with directory management"""
         group = QGroupBox("Customer Information")
         layout = QGridLayout()
         
         # Customer Name
         layout.addWidget(QLabel("Customer Name:"), 0, 0)
         self.customer_name = QLineEdit()
+        self.customer_name.textChanged.connect(self.update_customer_path)
         layout.addWidget(self.customer_name, 0, 1)
         
         # Customer ID
         layout.addWidget(QLabel("Customer ID:"), 1, 0)
         self.customer_id = QLineEdit()
+        self.customer_id.textChanged.connect(self.update_customer_path)
         layout.addWidget(self.customer_id, 1, 1)
         
         # Contact Email
@@ -160,7 +174,24 @@ class LicenseFrame(QFrame):
         self.contact_email = QLineEdit()
         layout.addWidget(self.contact_email, 2, 1)
         
+        # Customer Directory Path (read-only)
+        layout.addWidget(QLabel("License Directory:"), 3, 0)
+        self.directory_path = QLineEdit()
+        self.directory_path.setReadOnly(True)
+        layout.addWidget(self.directory_path, 3, 1)
+        
+        # Create Directory Button
+        self.create_dir_button = QPushButton("Create Directory")
+        self.create_dir_button.clicked.connect(self.create_customer_directory)
+        self.create_dir_button.setEnabled(False)
+        layout.addWidget(self.create_dir_button, 3, 2)
+        
         group.setLayout(layout)
+        
+        # Initialize directory manager
+        base_path = self.config.get('paths', {}).get('customer_base', 'customers')
+        self.dir_manager = CustomerDirectoryManager(base_path)
+        
         return group
         
     def create_license_group(self):
@@ -178,9 +209,15 @@ class LicenseFrame(QFrame):
         
         # Platform
         layout.addWidget(QLabel("Platform:"), 1, 0)
+        self.platform_label = QLabel("No platforms selected")  # Add this line
         self.platform_button = QPushButton("Select Platform...")
         self.platform_button.clicked.connect(self.show_platform_dialog)
-        layout.addWidget(self.platform_button, 1, 1)
+        
+        # Create a horizontal layout for platform selection
+        platform_layout = QHBoxLayout()
+        platform_layout.addWidget(self.platform_label)
+        platform_layout.addWidget(self.platform_button)
+        layout.addLayout(platform_layout, 1, 1)  # Changed from addWidget to addLayout
         
         # Expiration Date
         layout.addWidget(QLabel("Expiration Date:"), 2, 0)
@@ -247,10 +284,15 @@ class LicenseFrame(QFrame):
         
     def show_platform_dialog(self):
         """Show platform selection dialog"""
-        dialog = PlatformSelectDialog(self)
+        # Pass the currently selected platforms to the dialog
+        dialog = PlatformSelectDialog(current_platforms=self.selected_platforms, parent=self)
         if dialog.exec_():
-            # Handle platform selection
-            pass
+            self.selected_platforms = dialog.get_selected_platforms()
+            # Update the label to show selected platforms
+            if self.selected_platforms:
+                self.platform_label.setText(", ".join(self.selected_platforms))
+            else:
+                self.platform_label.setText("No platforms selected")
             
     def validate_form(self) -> Tuple[bool, List[str]]:
         """Validate all form inputs"""
@@ -285,46 +327,68 @@ class LicenseFrame(QFrame):
     def generate_license(self):
         """Generate license based on selected system"""
         try:
-            # Get selected license type
-            license_type = LicenseType(self.license_system_combo.currentText())
+            # Validate form first
+            valid, errors = self.validate_form()
+            if not valid:
+                QMessageBox.warning(
+                    self,
+                    "Validation Error",
+                    "\n".join(errors)
+                )
+                return
+
+            # Get selected license type from the license type combo
+            license_type = self.license_type_combo.currentData()  # This gets the LicenseType enum value
+            
+            # Get selected license system from the license system combo
+            license_system = self.license_system_combo.currentData()  # This gets the system ID (flexlm, hasp, etc.)
             
             # Get system-specific options
-            system_options = self.get_system_options(license_type)
+            system_options = self.get_system_options(license_system)
             
-            # Create appropriate generator
-            generator = LicenseGeneratorFactory.create_generator(
-                license_type,
-                self.signer
-            )
+            # Create appropriate generator based on the license system
+            if license_system == 'flexlm':
+                generator = FlexLMGenerator(self.signer)
+            elif license_system == 'hasp':
+                generator = HASPGenerator(self.signer)
+            else:
+                raise ValueError(f"Unsupported license system: {license_system}")
             
             # Generate license with system-specific options
             license_data = generator.generate_license(
                 self.get_customer_info(),
-                {**self.get_license_info(), **system_options},
+                {
+                    **self.get_license_info(),
+                    **system_options,
+                    'license_type': license_type.value  # Pass the license type value
+                },
                 self.get_products(),
                 self.get_host_info()
             )
             
             # Save license
-            self.save_license(license_data, license_type)
+            self.save_license(license_data, license_system)
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to generate license: {str(e)}")
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to generate license: {str(e)}"
+            )
     
-    def get_system_options(self, license_type: LicenseType) -> Dict:
+    def get_system_options(self, license_system: str) -> Dict:
         """Get options specific to the selected license system"""
-        if license_type == LicenseType.FLEXLM:
+        if license_system == 'flexlm':
             return {
-                'port': self.flexlm_port.value(),
-                'vendor_daemon': self.flexlm_vendor.text(),
-                'additional_options': self.flexlm_options.text()
+                'port': self.flexlm_port.value() if hasattr(self, 'flexlm_port') else 27000,
+                'vendor_daemon': self.flexlm_vendor.text() if hasattr(self, 'flexlm_vendor') else 'vendor_daemon',
+                'additional_options': self.flexlm_options.text() if hasattr(self, 'flexlm_options') else ''
             }
-        elif license_type == LicenseType.HASP:
+        elif license_system == 'hasp':
             return {
-                'feature_id': self.hasp_feature_id.value(),
-                'vendor_code': self.hasp_vendor_code.text()
+                'feature_id': self.hasp_feature_id.value() if hasattr(self, 'hasp_feature_id') else 1,
+                'vendor_code': self.hasp_vendor_code.text() if hasattr(self, 'hasp_vendor_code') else 'hasp'
             }
-        # Add other system options...
         return {}
     
     def preview_license(self):
@@ -489,22 +553,59 @@ class LicenseFrame(QFrame):
                 self.hasp_feature_id.setValue(1)
             # Add other systems if necessary
 
-    def save_license(self, license_data: str, license_type: LicenseType):
+    def save_license(self, license_data: str, license_system: str):
         """Save the license file with the appropriate extension"""
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save License File",
-            "",
-            f"{license_type.value} License Files (*.{license_type.value}lic);;All Files (*.*)"
-        )
-        
-        if file_path:
-            with open(file_path, 'w') as f:
-                f.write(license_data)
+        try:
+            customer_name = self.customer_name.text().strip()
+            customer_id = self.customer_id.text().strip()
+            
+            if not customer_name or not customer_id:
+                QMessageBox.warning(
+                    self,
+                    "Warning",
+                    "Please enter customer name and ID before saving."
+                )
+                return
+            
+            # Get or create the customer directory
+            path = self.dir_manager.create_customer_structure(customer_name, customer_id)
+            
+            # Determine file extension based on license system
+            extensions = {
+                'flexlm': '.lic',
+                'hasp': '.v2c',
+                'sentinel': '.c2v'
+            }
+            extension = extensions.get(license_system, '.lic')
+            
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"license_{timestamp}{extension}"
+            
+            # Full path for the license file
+            license_path = path / filename
+            
+            # Save the license data
+            if license_system == 'flexlm':
+                # Save as text file
+                with open(license_path, 'w') as f:
+                    f.write(license_data)
+            else:
+                # Save as binary file for other formats
+                with open(license_path, 'wb') as f:
+                    f.write(license_data)
+            
             QMessageBox.information(
                 self,
                 "Success",
-                f"License file saved successfully as {file_path}"
+                f"License saved successfully to:\n{license_path}"
+            )
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to save license: {str(e)}"
             )
 
     def setup_license_system_dropdown(self):
@@ -615,21 +716,178 @@ class LicenseFrame(QFrame):
                     "Valid credentials are required for server access."
                 )
 
+    def update_customer_path(self):
+        """Update the directory path display when customer info changes"""
+        customer_name = self.customer_name.text().strip()
+        customer_id = self.customer_id.text().strip()
+        
+        if customer_name and customer_id:
+            # Check if directory exists
+            current_path = self.dir_manager.get_customer_path(customer_name, customer_id)
+            
+            if current_path:
+                self.directory_path.setText(str(current_path))
+                self.create_dir_button.setEnabled(False)
+                self.directory_path.setStyleSheet("color: green;")
+            else:
+                # Show what the path would be
+                safe_name = self.dir_manager.sanitize_name(customer_name)
+                safe_id = self.dir_manager.sanitize_name(customer_id)
+                potential_path = self.dir_manager.base_path / safe_name / safe_id
+                self.directory_path.setText(f"{potential_path} (Not Created)")
+                self.create_dir_button.setEnabled(True)
+                self.directory_path.setStyleSheet("color: red;")
+        else:
+            self.directory_path.setText("")
+            self.create_dir_button.setEnabled(False)
+            self.directory_path.setStyleSheet("")
 
+    def create_customer_directory(self):
+        """Create the customer directory structure"""
+        try:
+            customer_name = self.customer_name.text().strip()
+            customer_id = self.customer_id.text().strip()
+            
+            if customer_name and customer_id:
+                path = self.dir_manager.create_customer_structure(customer_name, customer_id)
+                self.directory_path.setText(str(path))
+                self.directory_path.setStyleSheet("color: green;")
+                self.create_dir_button.setEnabled(False)
+                
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"Created directory structure for customer:\n{path}"
+                )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to create directory structure: {str(e)}"
+            )
 
+    def save_license(self):
+        """Save the current license in the customer's directory"""
+        try:
+            customer_name = self.customer_name.text().strip()
+            customer_id = self.customer_id.text().strip()
+            
+            if not customer_name or not customer_id:
+                QMessageBox.warning(
+                    self,
+                    "Warning",
+                    "Please enter customer name and ID before saving."
+                )
+                return
+            
+            # Get or create the customer directory
+            path = self.dir_manager.create_customer_structure(customer_name, customer_id)
+            
+            # Get the license system type and determine file extension
+            license_system = self.license_system_combo.currentData()
+            if license_system == 'flexlm':
+                extension = '.lic'
+            elif license_system == 'hasp':
+                extension = '.v2c'
+            elif license_system == 'sentinel':
+                extension = '.c2v'
+            else:
+                extension = '.lic'  # Default to .lic if unknown
+            
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"license_{timestamp}{extension}"
+            
+            # Full path for the license file
+            license_path = path / filename
+            
+            # Generate and save the license data
+            license_data = self.generate_license_data()
+            
+            # Save based on license system type
+            if license_system == 'flexlm':
+                # Save as text file
+                with open(license_path, 'w') as f:
+                    f.write(license_data)
+            else:
+                # Save as binary file for other formats if needed
+                with open(license_path, 'wb') as f:
+                    f.write(license_data)
+            
+            QMessageBox.information(
+                self,
+                "Success",
+                f"License saved successfully to:\n{license_path}"
+            )
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to save license: {str(e)}"
+            )
 
+    def generate_license_data(self):
+        """Generate the license data based on the selected license system"""
+        license_system = self.license_system_combo.currentData()
+        
+        if license_system == 'flexlm':
+            # Generate FlexLM format
+            generator = FlexLMGenerator(self.signer)
+            return generator.generate_license(
+                self.get_customer_info(),
+                self.get_license_info(),
+                self.get_products(),
+                self.get_host_info()
+            )
+        elif license_system == 'hasp':
+            # Generate HASP format
+            generator = HASPGenerator(self.signer)
+            return generator.generate_license(
+                self.get_customer_info(),
+                self.get_license_info(),
+                self.get_products(),
+                self.get_host_info()
+            )
+        # Add other license system generators as needed
+        
+        raise ValueError(f"Unsupported license system: {license_system}")
 
+    def get_license_info(self) -> Dict:
+        """Get license information from the form"""
+        return {
+            'expiration_date': self.expiration_date.date().toPyDate(),  # Convert to Python date
+            'maintenance_date': self.maintenance_date.date().toPyDate(),  # Convert to Python date
+            'license_type': self.license_type_combo.currentData().value,
+            'platforms': getattr(self, 'selected_platforms', []),
+            # Add any other license info fields
+        }
 
+    def get_host_info(self) -> Dict:
+        """Get host information"""
+        # You might want to get this from a form or configuration
+        return {
+            'hostid': 'ANY',  # Default to ANY if not specified
+            'port': '27000'   # Default port
+        }
 
+    def get_customer_info(self) -> Dict:
+        """Get customer information from the form"""
+        return {
+            'name': self.customer_name.text().strip(),
+            'id': self.customer_id.text().strip(),
+            'email': self.contact_email.text().strip()
+        }
 
-
-
-
-
-
-
-
-
-
-
-
+    def refresh_product_list(self):
+        """Refresh the product table after changes"""
+        # Clear existing rows
+        self.product_table.setRowCount(0)
+        
+        # Load products from config
+        products = self.config.get('products', [])
+        
+        # Add each product to the table
+        for product_data in products:
+            product = Product(**product_data)
+            self.add_product_to_table(product)
