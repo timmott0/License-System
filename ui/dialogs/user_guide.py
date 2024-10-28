@@ -30,6 +30,8 @@ class UserGuideDialog(QDialog):
             <li><a href="#license-types">License Types and Generation</a></li>
             <li><a href="#directory-structure">Directory Structure</a></li>
             <li><a href="#server-sync">Server Synchronization</a></li>
+            <li><a href="#server-setup">Server Setup</a></li>
+            <li><a href="#ui-navigation">User Interface Navigation</a></li>
         </ul>
 
         <h2 id="system-architecture">System Architecture</h2>
@@ -168,6 +170,40 @@ class UserGuideDialog(QDialog):
             <li>Enable/disable systems as needed</li>
             <li>Test connection using health check tool</li>
         </ol>
+
+        <h2 id="server-setup">Server Setup</h2>
+        <p>This section guides you through setting up the server connection and managing server credentials.</p>
+
+        <h3>1. Configuring Server Connection</h3>
+        <ol>
+            <li>Open the <strong>Settings Dialog</strong> from the main menu.</li>
+            <li>Navigate to the <strong>General</strong> tab.</li>
+            <li>Enter the <strong>Primary Server Host</strong> and <strong>Port</strong> where your server is hosted.</li>
+            <li>Optionally, enter a <strong>Backup Server Host</strong> and <strong>Port</strong> for redundancy.</li>
+            <li>Adjust <strong>Connection Timeout</strong> and <strong>Max Retry Attempts</strong> as needed.</li>
+            <li>Enable <strong>Use SSL/TLS</strong> for secure connections and <strong>Verify SSL Certificate</strong> if required.</li>
+            <li>If using a custom SSL certificate, click <strong>Browse...</strong> to select the certificate file.</li>
+        </ol>
+
+        <h3>2. Managing Server Credentials</h3>
+        <ol>
+            <li>Switch to the <strong>Server Credentials</strong> tab in the Settings Dialog.</li>
+            <li>To add new credentials, click <strong>Add</strong> and enter the server path, username, and password.</li>
+            <li>To edit existing credentials, select an entry and click <strong>Edit</strong>.</li>
+            <li>To remove credentials, select an entry and click <strong>Remove</strong>.</li>
+            <li>Ensure the <strong>Primary Server Host</strong> is correctly set as the server path for credentials.</li>
+        </ol>
+
+        <h3>3. Saving Your Settings</h3>
+        <p>After configuring the server settings and managing credentials, click <strong>OK</strong> to save your changes. This will update the application's configuration with your new settings.</p>
+
+        <h2 id="ui-navigation">User Interface Navigation</h2>
+        <p>This section provides an overview of navigating the user interface of the License Management System.</p>
+        <ul>
+            <li><strong>Main Window:</strong> The main window provides access to all major features, including license generation and key management.</li>
+            <li><strong>Settings Dialog:</strong> Accessed via the main menu, this dialog allows you to configure server settings and manage credentials.</li>
+            <li><strong>Help Menu:</strong> Provides access to this user guide and other resources.</li>
+        </ul>
 
         <h2>Security Considerations</h2>
         <ul>

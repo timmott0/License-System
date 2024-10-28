@@ -51,6 +51,18 @@ class CredentialsManager:
                 server_path,
                 encrypted_data.decode()
             )
+            
+            # Update stored paths
+            stored_paths = self.get_stored_paths()
+            if server_path not in stored_paths:
+                stored_paths.append(server_path)
+                keyring.set_password(
+                    self.keyring_service,
+                    "stored_paths",
+                    json.dumps(stored_paths)
+                )
+            
+            print(f"Credentials for {server_path} saved successfully.")
             return True
         except Exception as e:
             print(f"Failed to save credentials: {str(e)}")

@@ -21,5 +21,29 @@
             "default_port": 8080,
             "description": "Custom implementation of license server"
         }
+    },
+    "paths": {
+        "config": "config",
+        "keys": {
+            "private_key_path": "config/keys/private_key.pem",
+            "public_key_path": "config/keys/public_key.pem"
+        },
+        "default_save": "C:/Users/timot/MLK-python/src/severpathtest",
+        "customer_base": "customers"
+    },
+    "server": {
+        "host": "192.168.0.11",
+        "port": 5001
+    },
+    "backup_server": {
+        "host": "",
+        "port": 5001
+    },
+    "connection": {
+        "timeout": 30,
+        "max_retries": 3,
+        "use_ssl": true,
+        "verify_ssl": false,
+        "cert_path": ""
     }
 }

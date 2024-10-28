@@ -5,6 +5,11 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
 from PyQt5.QtCore import Qt
 from security.credentials_manager import CredentialsManager
 from .credentials_dialog import CredentialsDialog
+import socket
+import ssl
+from urllib.parse import urlparse
+import requests
+from requests.auth import HTTPBasicAuth
 
 class CommonSettingsDialog(QDialog):
     def __init__(self, config, parent=None):
@@ -45,6 +50,13 @@ class CommonSettingsDialog(QDialog):
         button_layout.addWidget(cancel_button)
         layout.addLayout(button_layout)
         
+        # Connect SSL checkbox state changes
+        self.use_ssl.stateChanged.connect(self.on_ssl_state_changed)
+        self.verify_ssl.stateChanged.connect(self.on_verify_ssl_state_changed)
+        
+        # Initial SSL state setup
+        self.on_ssl_state_changed(self.use_ssl.checkState())
+
     def create_general_tab(self):
         """Create the general settings tab with server connection settings"""
         widget = QWidget()
@@ -60,8 +72,15 @@ class CommonSettingsDialog(QDialog):
         self.primary_server_port.setRange(1, 65535)
         self.primary_server_port.setValue(self.config.get('server', {}).get('port', 27000))
         
-        server_layout.addRow("Primary Server Host:", self.primary_server_host)
-        server_layout.addRow("Primary Server Port:", self.primary_server_port)
+        # Add Test Connection button next to Primary Server Host
+        primary_server_layout = QHBoxLayout()
+        primary_server_layout.addWidget(self.primary_server_host)
+        test_connection_btn = QPushButton("Test Connection")
+        test_connection_btn.clicked.connect(self.test_server_connection)
+        primary_server_layout.addWidget(test_connection_btn)
+        
+        server_layout.addRow("Primary Server Host:", primary_server_layout)
+        server_layout.addRow("Primary Server Port:", self.primary_server_port)  # Add this line
         
         # Backup Server (Optional)
         self.backup_server_host = QLineEdit()
@@ -160,14 +179,17 @@ class CommonSettingsDialog(QDialog):
         add_button = QPushButton("Add")
         edit_button = QPushButton("Edit")
         remove_button = QPushButton("Remove")
+        test_creds_button = QPushButton("Test Credentials")  # Add new button
         
         add_button.clicked.connect(self.add_credentials)
         edit_button.clicked.connect(self.edit_credentials)
         remove_button.clicked.connect(self.remove_credentials)
+        test_creds_button.clicked.connect(self.test_credentials)  # Add new connection
         
         button_layout.addWidget(add_button)
         button_layout.addWidget(edit_button)
         button_layout.addWidget(remove_button)
+        button_layout.addWidget(test_creds_button)  # Add button to layout
         layout.addLayout(button_layout)
         
         # Load existing credentials
@@ -180,8 +202,11 @@ class CommonSettingsDialog(QDialog):
         self.credentials_table.setRowCount(0)
         stored_paths = self.credentials_manager.get_stored_paths()
         
+        print(f"Stored paths: {stored_paths}")  # Debugging line
+
         for path in stored_paths:
             credentials = self.credentials_manager.get_credentials(path)
+            print(f"Loading credentials for {path}: {credentials}")  # Debugging line
             if credentials:
                 row = self.credentials_table.rowCount()
                 self.credentials_table.insertRow(row)
@@ -190,19 +215,31 @@ class CommonSettingsDialog(QDialog):
     
     def add_credentials(self):
         """Add new server credentials"""
-        dialog = CredentialsDialog(server_path="", parent=self)
+        server_path = self.primary_server_host.text().strip()  # Use Primary Server Host as server_path
+        if not server_path:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Primary Server Host cannot be empty."
+            )
+            return
+
+        dialog = CredentialsDialog(server_path=server_path, parent=self)
         if dialog.exec_():
             credentials = dialog.get_credentials()
-            server_path = dialog.get_server_path()
             
             # Save credentials
-            if self.credentials_manager.save_credentials(
+            success = self.credentials_manager.save_credentials(
                 server_path,
                 credentials['username'],
                 credentials['password']
-            ):
+            )
+            
+            if success:
+                print("Credentials saved successfully.")
                 self.load_credentials()  # Refresh table
             else:
+                print("Failed to save credentials.")
                 QMessageBox.warning(
                     self,
                     "Error",
@@ -224,7 +261,7 @@ class CommonSettingsDialog(QDialog):
             
             if dialog.exec_():
                 credentials = dialog.get_credentials()
-                new_server_path = dialog.get_server_path()
+                new_server_path = self.primary_server_host.text().strip()  # Use Primary Server Host as new server_path
                 
                 # If path changed, delete old credentials
                 if new_server_path != server_path:
@@ -299,8 +336,219 @@ class CommonSettingsDialog(QDialog):
         if directory:
             self.customer_base_path.setText(directory)
 
+    def on_ssl_state_changed(self, state):
+        """Handle SSL checkbox state changes"""
+        is_enabled = state == Qt.Checked
+        self.verify_ssl.setEnabled(is_enabled)
+        self.cert_path.setEnabled(is_enabled)
+        
+        if not is_enabled:
+            self.verify_ssl.setChecked(False)
+            self.cert_path.clear()
+
+    def on_verify_ssl_state_changed(self, state):
+        """Handle Verify SSL checkbox state changes"""
+        is_enabled = state == Qt.Checked
+        self.cert_path.setEnabled(is_enabled)
+        
+        if not is_enabled:
+            self.cert_path.clear()
+
+    def test_server_connection(self):
+        """Test connection to the primary server"""
+        host = self.primary_server_host.text().strip()
+        port = self.primary_server_port.value()
+        timeout = self.timeout_spinbox.value()
+        use_ssl = self.use_ssl.isChecked()
+
+        if not host:
+            QMessageBox.warning(
+                self,
+                "Connection Test",
+                "Please enter a server host address."
+            )
+            return
+
+        # Add debug message
+        print(f"Attempting to connect to {host}:{port}")
+        print(f"SSL Enabled: {use_ssl}")
+
+        try:
+            # Create a progress dialog
+            progress = QMessageBox(self)
+            progress.setIcon(QMessageBox.Information)
+            progress.setText(f"Testing connection to {host}:{port}...")
+            progress.setStandardButtons(QMessageBox.NoButton)
+            progress.show()
+            
+            # Create socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+
+            # Try to resolve hostname first
+            try:
+                ip_address = socket.gethostbyname(host)
+                print(f"Resolved {host} to {ip_address}")
+            except socket.gaierror:
+                progress.hide()
+                QMessageBox.critical(
+                    self,
+                    "Connection Test",
+                    f"Could not resolve hostname: {host}\nPlease verify the hostname/IP is correct."
+                )
+                return
+
+            # If using SSL/TLS
+            if use_ssl:
+                try:
+                    context = ssl.create_default_context()
+                    context.check_hostname = False
+                    context.verify_mode = ssl.CERT_NONE
+                    sock = context.wrap_socket(sock, server_hostname=host)
+                except Exception as e:
+                    print(f"SSL Setup Error: {str(e)}")
+                    raise
+
+            # Try to connect
+            try:
+                sock.connect((host, port))
+                print(f"Successfully connected to {host}:{port}")
+            except ConnectionRefusedError:
+                raise Exception(
+                    f"Connection refused. Please verify:\n"
+                    f"1. Port {port} is open on {host}\n"
+                    f"2. The service is running\n"
+                    f"3. Firewall allows the connection"
+                )
+
+            sock.close()
+            
+            progress.hide()
+            QMessageBox.information(
+                self,
+                "Connection Test",
+                f"Successfully connected to {host}:{port}"
+            )
+
+        except Exception as e:
+            progress.hide()
+            QMessageBox.critical(
+                self,
+                "Connection Test",
+                f"Connection failed:\n{str(e)}"
+            )
+        finally:
+            try:
+                sock.close()
+            except:
+                pass
+
+    def test_credentials(self):
+        """Test the selected credentials"""
+        current_row = self.credentials_table.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(
+                self,
+                "Test Credentials",
+                "Please select credentials to test."
+            )
+            return
+
+        server_path = self.credentials_table.item(current_row, 0).text()
+        credentials = self.credentials_manager.get_credentials(server_path)
+        
+        if not credentials:
+            QMessageBox.warning(
+                self,
+                "Test Credentials",
+                "Could not retrieve credentials for testing."
+            )
+            return
+
+        # Get connection details
+        host = self.primary_server_host.text().strip()
+        port = self.primary_server_port.value()
+        use_ssl = self.use_ssl.isChecked()
+        
+        try:
+            # Create a progress dialog
+            progress = QMessageBox(self)
+            progress.setIcon(QMessageBox.Information)
+            progress.setText(f"Testing credentials for {server_path}...")
+            progress.setStandardButtons(QMessageBox.NoButton)
+            progress.show()
+
+            # Construct the URL
+            protocol = "https" if use_ssl else "http"
+            url = f"{protocol}://{host}:{port}"
+
+            # Create HTTP request
+            import requests
+            from requests.auth import HTTPBasicAuth
+            
+            # Disable SSL verification warnings if SSL verification is disabled
+            if use_ssl and not self.verify_ssl.isChecked():
+                import urllib3
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            
+            response = requests.get(
+                url,
+                auth=HTTPBasicAuth(credentials['username'], credentials['password']),
+                verify=self.verify_ssl.isChecked() if use_ssl else True,
+                timeout=self.timeout_spinbox.value()
+            )
+            
+            progress.hide()
+
+            if response.status_code == 200:
+                QMessageBox.information(
+                    self,
+                    "Test Credentials",
+                    f"Successfully authenticated with server using credentials for {server_path}"
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Test Credentials",
+                    f"Authentication failed with status code: {response.status_code}\n"
+                    f"Response: {response.text}"
+                )
+
+        except requests.exceptions.SSLError as e:
+            progress.hide()
+            QMessageBox.critical(
+                self,
+                "Test Credentials",
+                f"SSL/TLS Error:\n{str(e)}\n\n"
+                "Try disabling SSL verification if using a self-signed certificate."
+            )
+        except requests.exceptions.ConnectionError as e:
+            progress.hide()
+            QMessageBox.critical(
+                self,
+                "Test Credentials",
+                f"Connection Error:\n{str(e)}\n\n"
+                "Please verify the server address and port are correct."
+            )
+        except Exception as e:
+            progress.hide()
+            QMessageBox.critical(
+                self,
+                "Test Credentials",
+                f"Failed to test credentials:\n{str(e)}"
+            )
+
     def accept(self):
         """Save settings when OK is clicked"""
+        # Validate primary server host
+        if not self.primary_server_host.text().strip():
+            QMessageBox.warning(
+                self,
+                "Invalid Settings",
+                "Primary Server Host cannot be empty."
+            )
+            return
+            
         # Update config with new values
         if 'server' not in self.config:
             self.config['server'] = {}
@@ -333,5 +581,17 @@ class CommonSettingsDialog(QDialog):
         # Update customer base path
         self.config['paths']['customer_base'] = self.customer_base_path.text()
         
+        # Validate SSL settings
+        if self.use_ssl.isChecked():
+            if self.verify_ssl.isChecked() and not self.cert_path.text().strip():
+                QMessageBox.warning(
+                    self,
+                    "Invalid Settings",
+                    "When SSL verification is enabled, a certificate path must be provided."
+                )
+                return
+        
         # Load existing values when dialog is created
         super().accept()
+
+
