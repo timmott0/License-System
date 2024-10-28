@@ -172,27 +172,69 @@ class UserGuideDialog(QDialog):
         </ol>
 
         <h2 id="server-setup">Server Setup</h2>
-        <p>This section guides you through setting up the server connection and managing server credentials.</p>
-
-        <h3>1. Configuring Server Connection</h3>
+        
+        <h3>License Systems Configuration</h3>
+        <p>The License Systems Configuration dialog allows you to manage different licensing backends supported by the system.</p>
+        
+        <h4>Accessing the Configuration:</h4>
         <ol>
-            <li>Open the <strong>Settings Dialog</strong> from the main menu.</li>
-            <li>Navigate to the <strong>General</strong> tab.</li>
-            <li>Enter the <strong>Primary Server Host</strong> and <strong>Port</strong> where your server is hosted.</li>
-            <li>Optionally, enter a <strong>Backup Server Host</strong> and <strong>Port</strong> for redundancy.</li>
-            <li>Adjust <strong>Connection Timeout</strong> and <strong>Max Retry Attempts</strong> as needed.</li>
-            <li>Enable <strong>Use SSL/TLS</strong> for secure connections and <strong>Verify SSL Certificate</strong> if required.</li>
-            <li>If using a custom SSL certificate, click <strong>Browse...</strong> to select the certificate file.</li>
+            <li>Navigate to <strong>Settings → License Systems</strong> in the main menu</li>
+            <li>The dialog displays all available licensing systems</li>
         </ol>
+
+        <h4>Configuration Options:</h4>
+        <ul>
+            <li><strong>License System Selection:</strong> Choose from supported systems (FlexLM, HASP, etc.)</li>
+            <li><strong>Enable/Disable:</strong> Toggle individual licensing systems on/off</li>
+            <li><strong>System Description:</strong> View detailed information about each system</li>
+        </ul>
+
+        <h4>Why Configure License Systems:</h4>
+        <ul>
+            <li>Control which licensing backends are active in your environment</li>
+            <li>Disable unused systems to improve performance and security</li>
+            <li>Ensure compatibility with your existing license infrastructure</li>
+            <li>Manage resource allocation for different licensing methods</li>
+        </ul>
+
+        <h4>Best Practices:</h4>
+        <ul>
+            <li>Enable only the systems you actively use</li>
+            <li>Review system descriptions before enabling</li>
+            <li>Test configuration changes in a non-production environment first</li>
+            <li>Document which systems are enabled for your deployment</li>
+        </ul>
 
         <h3>2. Managing Server Credentials</h3>
         <ol>
-            <li>Switch to the <strong>Server Credentials</strong> tab in the Settings Dialog.</li>
-            <li>To add new credentials, click <strong>Add</strong> and enter the server path, username, and password.</li>
-            <li>To edit existing credentials, select an entry and click <strong>Edit</strong>.</li>
-            <li>To remove credentials, select an entry and click <strong>Remove</strong>.</li>
-            <li>Ensure the <strong>Primary Server Host</strong> is correctly set as the server path for credentials.</li>
+            <li>Navigate to <strong>Settings → Server Configuration</strong> in the main menu.</li>
+            <li>Configure each license system:
+                <ul>
+                    <li>Select the license system from the dropdown</li>
+                    <li>Enable or disable the system using the checkbox</li>
+                    <li>Review the system description for important details</li>
+                    <li>Configure system-specific settings if required</li>
+                </ul>
+            </li>
+            <li>For each enabled system:
+                <ul>
+                    <li>Verify network connectivity</li>
+                    <li>Test server authentication</li>
+                    <li>Configure backup servers if available</li>
+                    <li>Set appropriate timeout values</li>
+                </ul>
+            </li>
+            <li>Click <strong>OK</strong> to save your configuration or <strong>Cancel</strong> to discard changes.</li>
         </ol>
+
+        <h4>Important Considerations:</h4>
+        <ul>
+            <li>Keep server configurations up to date</li>
+            <li>Document any custom settings</li>
+            <li>Regularly test server connectivity</li>
+            <li>Maintain secure backup configurations</li>
+            <li>Monitor server logs for connection issues</li>
+        </ul>
 
         <h3>3. Saving Your Settings</h3>
         <p>After configuring the server settings and managing credentials, click <strong>OK</strong> to save your changes. This will update the application's configuration with your new settings.</p>

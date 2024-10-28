@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                           QComboBox, QCheckBox, QPushButton, QFormLayout, QGroupBox, QLineEdit, QSpinBox)
+                           QComboBox, QCheckBox, QPushButton, QFormLayout, QGroupBox, QLineEdit, QSpinBox,
+                           QDialogButtonBox, QMessageBox)  # Added QMessageBox
 from PyQt5.QtCore import Qt, QSize
 import sys
 import os
@@ -18,121 +19,162 @@ class LicenseSystemsDialog(QDialog):
         self.setup_ui()
         
     def setup_ui(self):
+        """Initialize the dialog UI"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(10)
-        layout.setContentsMargins(20, 20, 20, 20)
         
-        # Add a label at the top
-        title_label = QLabel("Configure License Systems")
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        layout.addWidget(title_label)
-        
-        form_layout = QFormLayout()
-        form_layout.setSpacing(10)
-        
-        # Debug print
-        print("Config contents:", self.config)
-        print("License systems in config:", self.config.get('license_systems', {}))
-        
-        # Create combo box for license systems
+        # System selection and basic settings
+        system_layout = QFormLayout()
         self.system_combo = QComboBox()
-        self.system_combo.setMinimumWidth(200)  # Set minimum width
+        for system_id, system in self.config.get('license_systems', {}).items():
+            self.system_combo.addItem(system['name'], system_id)
+        system_layout.addRow("License System:", self.system_combo)
         
-        # Populate combo box
-        license_systems = self.config.get('license_systems', {})
-        if not license_systems:
-            print("No license systems found, using DEFAULT_SYSTEMS")
-            # Use DEFAULT_SYSTEMS if no systems in config
-            from config.license_systems import DEFAULT_SYSTEMS
-            license_systems = {
-                system_id: {
-                    "name": system.name,
-                    "enabled": system.enabled,
-                    "install_path": str(system.install_path),
-                    "default_port": system.default_port,
-                    "description": system.description
-                }
-                for system_id, system in DEFAULT_SYSTEMS.items()
-            }
-            self.config['license_systems'] = license_systems
-        
-        for system_id, system_data in license_systems.items():
-            print(f"Adding system to combo box: {system_data['name']} ({system_id})")
-            self.system_combo.addItem(system_data['name'], system_id)
-        
-        form_layout.addRow("License System:", self.system_combo)
-        
-        # Create enabled checkbox
+        # Enable/Disable checkbox
         self.enabled_checkbox = QCheckBox("Enabled")
-        form_layout.addRow("Status:", self.enabled_checkbox)
+        system_layout.addRow("", self.enabled_checkbox)
         
-        # Add description label
+        # Description label
         self.description_label = QLabel()
-        self.description_label.setWordWrap(True)
-        form_layout.addRow("Description:", self.description_label)
+        system_layout.addRow("Description:", self.description_label)
         
-        # Add database configuration section
-        self.db_config_group = QGroupBox("Database Configuration")
-        self.db_config_group.setVisible(False)  # Hide by default
-        db_layout = QFormLayout()
+        layout.addLayout(system_layout)
         
-        self.db_type_combo = QComboBox()
-        self.db_type_combo.addItems(['mysql', 'postgresql', 'sqlite', 'mssql'])
-        self.db_host = QLineEdit()
-        self.db_port = QSpinBox()
-        self.db_port.setRange(1, 65535)
-        self.db_name = QLineEdit()
-        self.db_user = QLineEdit()
+        # Credentials group
+        credentials_group = QGroupBox("Credentials")
+        credentials_layout = QFormLayout()
         
-        db_layout.addRow("Database Type:", self.db_type_combo)
-        db_layout.addRow("Host:", self.db_host)
-        db_layout.addRow("Port:", self.db_port)
-        db_layout.addRow("Database Name:", self.db_name)
-        db_layout.addRow("Username:", self.db_user)
+        self.username_edit = QLineEdit()
+        self.password_edit = QLineEdit()
+        self.password_edit.setEchoMode(QLineEdit.Password)
+        self.save_credentials_cb = QCheckBox("Save credentials")
         
-        self.db_config_group.setLayout(db_layout)
-        layout.addWidget(self.db_config_group)
+        credentials_layout.addRow("Username:", self.username_edit)
+        credentials_layout.addRow("Password:", self.password_edit)
+        credentials_layout.addRow("", self.save_credentials_cb)
         
-        # Add form layout to main layout
-        layout.addLayout(form_layout)
+        credentials_group.setLayout(credentials_layout)
+        layout.addWidget(credentials_group)
         
-        # Add spacer
-        layout.addStretch()
+        # OK/Cancel buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
         
-        # Add buttons
-        button_layout = QHBoxLayout()
-        save_button = QPushButton("Save")
-        cancel_button = QPushButton("Cancel")
+        # Add Test Connection button
+        self.test_button = QPushButton("Test Connection")
+        self.test_button.clicked.connect(self.test_connection)
+        layout.addWidget(self.test_button)
         
-        save_button.setFixedWidth(100)
-        cancel_button.setFixedWidth(100)
-        
-        save_button.clicked.connect(self.accept)
-        cancel_button.clicked.connect(self.reject)
-        
-        button_layout.addStretch()
-        button_layout.addWidget(save_button)
-        button_layout.addWidget(cancel_button)
-        layout.addLayout(button_layout)
-        
-        # Connect combo box change to update UI
-        self.system_combo.currentIndexChanged.connect(self.update_system_status)
-        self.update_system_status()  # Initialize with current selection
-        
-        # Connect system type changes
-        self.system_combo.currentIndexChanged.connect(self.on_system_changed)
+        # Connect signals
+        self.system_combo.currentIndexChanged.connect(self.update_system_info)
+        self.update_system_info()
 
-    def update_system_status(self):
+    def accept(self):
+        """Save settings when OK is clicked"""
+        system_id = self.system_combo.currentData()
+        if system_id:
+            system_data = self.config['license_systems'][system_id]
+            system_data['enabled'] = self.enabled_checkbox.isChecked()
+            
+            if self.save_credentials_cb.isChecked():
+                # Save credentials securely using keyring
+                import keyring
+                keyring.set_password(
+                    "license_manager",
+                    f"{system_id}_username",
+                    self.username_edit.text()
+                )
+                keyring.set_password(
+                    "license_manager",
+                    f"{system_id}_password",
+                    self.password_edit.text()
+                )
+            else:
+                # Remove any saved credentials
+                import keyring
+                try:
+                    keyring.delete_password("license_manager", f"{system_id}_username")
+                    keyring.delete_password("license_manager", f"{system_id}_password")
+                except keyring.errors.PasswordDeleteError:
+                    pass  # No saved credentials to delete
+        
+        super().accept()
+
+    def update_system_info(self):
+        """Update UI with system info and load saved credentials"""
         system_id = self.system_combo.currentData()
         if system_id:
             system_data = self.config['license_systems'].get(system_id, {})
             self.enabled_checkbox.setChecked(system_data.get('enabled', False))
             self.description_label.setText(system_data.get('description', ''))
             print(f"Updated status for system {system_id}: {system_data}")
+            
+            # Load saved credentials if they exist
+            import keyring
+            saved_username = keyring.get_password("license_manager", f"{system_id}_username")
+            saved_password = keyring.get_password("license_manager", f"{system_id}_password")
+            
+            if saved_username and saved_password:
+                self.username_edit.setText(saved_username)
+                self.password_edit.setText(saved_password)
+                self.save_credentials_cb.setChecked(True)
+            else:
+                self.username_edit.clear()
+                self.password_edit.clear()
+                self.save_credentials_cb.setChecked(False)
 
-    def on_system_changed(self):
+    def test_connection(self):
+        """Test connection to the selected license system"""
         system_id = self.system_combo.currentData()
-        if system_id:
-            system_data = self.config['license_systems'][system_id]
-            is_database = system_data.get('system_type') == 'database'
-            self.db_config_group.setVisible(is_database)
+        if not system_id:
+            QMessageBox.warning(self, "Error", "Please select a license system")
+            return
+            
+        system_data = self.config['license_systems'].get(system_id)
+        if not system_data:
+            QMessageBox.warning(self, "Error", "Invalid system configuration")
+            return
+            
+        try:
+            # Get connection details
+            host = system_data.get('host', 'localhost')
+            port = system_data.get('port', 27000)
+            system_type = system_data.get('system_type')
+            
+            if not system_type:
+                raise ValueError("System type not configured")
+                
+            # Create appropriate connection handler based on system type
+            if system_type == 'flexlm':
+                from license_handlers.flexlm import FlexLMHandler
+                handler = FlexLMHandler(host, port)
+            elif system_type == 'hasp':
+                from license_handlers.hasp import HASPHandler
+                handler = HASPHandler(host, port)
+            else:
+                raise ValueError(f"Unsupported system type: {system_type}")
+                
+            # Test connection
+            handler.test_connection(
+                username=self.username_edit.text(),
+                password=self.password_edit.text()
+            )
+            
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Successfully connected to {system_data['name']}"
+            )
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Connection Failed",
+                f"Failed to connect: {str(e)}\n\nPlease verify:\n"
+                "1. System configuration is correct\n"
+                "2. Server is running and accessible\n"
+                "3. Credentials are valid"
+            )

@@ -332,9 +332,18 @@ class MainWindow(QMainWindow):
                     system_id: {
                         "name": system.name,
                         "enabled": system.enabled,
-                        "install_path": str(system.install_path),
+                        "system_type": system.system_type,  # Add this
+                        "install_path": str(system.install_path) if system.install_path else None,
                         "default_port": system.default_port,
-                        "description": system.description
+                        "description": system.description,
+                        "database_config": {  # Add this block
+                            "type": system.database_config.type,
+                            "host": system.database_config.host,
+                            "port": system.database_config.port,
+                            "database": system.database_config.database,
+                            "username": system.database_config.username,
+                            "connection_string": system.database_config.connection_string
+                        } if system.database_config else None
                     }
                     for system_id, system in DEFAULT_SYSTEMS.items()
                 }
@@ -434,3 +443,4 @@ class MainWindow(QMainWindow):
         """Show the user guide dialog"""
         guide = UserGuideDialog(self)
         guide.exec_()
+

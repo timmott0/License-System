@@ -20,6 +20,19 @@
             "install_path": "vendor\\custom",
             "default_port": 8080,
             "description": "Custom implementation of license server"
+        },
+        "mysql_licenses": {
+            "name": "MySQL License Database",
+            "enabled": true,
+            "system_type": "database",
+            "description": "MySQL-based license management",
+            "database_config": {
+                "type": "mysql",
+                "host": "localhost",
+                "port": 3306,
+                "database": "licenses",
+                "username": ""
+            }
         }
     },
     "paths": {

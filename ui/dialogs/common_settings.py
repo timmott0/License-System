@@ -1,7 +1,8 @@
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
                            QLabel, QLineEdit, QSpinBox, QPushButton,
                            QCheckBox, QTabWidget, QWidget, QTableWidget,
-                           QTableWidgetItem, QMessageBox, QGroupBox, QFileDialog)
+                           QTableWidgetItem, QMessageBox, QGroupBox, QFileDialog,
+                           QComboBox, QStackedWidget)
 from PyQt5.QtCore import Qt
 from security.credentials_manager import CredentialsManager
 from .credentials_dialog import CredentialsDialog
@@ -24,17 +25,19 @@ class CommonSettingsDialog(QDialog):
         self.setModal(True)
         
         layout = QVBoxLayout(self)
-        
-        # Create tab widget
         tab_widget = QTabWidget()
         
-        # General Settings Tab
-        general_tab = self.create_general_tab()
-        tab_widget.addTab(general_tab, "General")
+        # License Systems
+        tools_tab = self.create_tools_tab()
+        tab_widget.addTab(tools_tab, "License Systems")
         
-        # Server Credentials Tab
-        credentials_tab = self.create_credentials_tab()
-        tab_widget.addTab(credentials_tab, "Server Credentials")
+        # Server Settings Tab
+        server_tab = self.create_server_tab()
+        tab_widget.addTab(server_tab, "Server Settings")
+        
+        # Paths Tab
+        paths_tab = self.create_paths_tab()
+        tab_widget.addTab(paths_tab, "Paths")
         
         layout.addWidget(tab_widget)
         
@@ -57,112 +60,147 @@ class CommonSettingsDialog(QDialog):
         # Initial SSL state setup
         self.on_ssl_state_changed(self.use_ssl.checkState())
 
-    def create_general_tab(self):
-        """Create the general settings tab with server connection settings"""
+    def create_tools_tab(self):
+        """Create the tools tab with license system settings"""
         widget = QWidget()
-        layout = QFormLayout(widget)
+        layout = QVBoxLayout(widget)
         
-        # Server Connection Settings group
-        server_group = QGroupBox("Server Connection")
-        server_layout = QFormLayout()
+        # License Systems Group
+        systems_group = QGroupBox("License Systems")
+        systems_layout = QVBoxLayout()
+        
+        # System selection
+        self.system_combo = QComboBox()
+        for system_id, system in self.config.get('license_systems', {}).items():
+            self.system_combo.addItem(system['name'], system_id)
+        self.system_combo.currentIndexChanged.connect(self.on_system_changed)
+        systems_layout.addWidget(self.system_combo)
+        
+        # Credentials Group
+        creds_group = QGroupBox("System Credentials")
+        creds_layout = QFormLayout()
+        
+        self.system_username = QLineEdit()
+        self.system_password = QLineEdit()
+        self.system_password.setEchoMode(QLineEdit.Password)
+        
+        creds_layout.addRow("Username:", self.system_username)
+        creds_layout.addRow("Password:", self.system_password)
+        
+        # Test Connection button
+        test_btn_layout = QHBoxLayout()
+        test_connection_btn = QPushButton("Test Connection")
+        test_connection_btn.clicked.connect(self.test_system_connection)
+        test_btn_layout.addWidget(test_connection_btn)
+        creds_layout.addRow("", test_btn_layout)
+        
+        creds_group.setLayout(creds_layout)
+        systems_layout.addWidget(creds_group)
+        
+        # System-specific settings container
+        self.system_settings = QStackedWidget()
+        systems_layout.addWidget(self.system_settings)
+        
+        # Add pages for each system type
+        self.add_system_pages()
+        
+        systems_group.setLayout(systems_layout)
+        layout.addWidget(systems_group)
+        
+        return widget
+
+    def add_system_pages(self):
+        """Add settings pages for each license system type"""
+        # Network-based systems page (FlexLM, HASP)
+        network_page = QWidget()
+        network_layout = QFormLayout(network_page)
+        
+        self.install_path = QLineEdit()
+        browse_btn = QPushButton("Browse...")
+        browse_btn.clicked.connect(self.browse_install_path)
+        path_layout = QHBoxLayout()
+        path_layout.addWidget(self.install_path)
+        path_layout.addWidget(browse_btn)
+        network_layout.addRow("Install Path:", path_layout)
+        
+        self.default_port = QSpinBox()
+        self.default_port.setRange(1, 65535)
+        network_layout.addRow("Default Port:", self.default_port)
+        
+        self.system_settings.addWidget(network_page)
+        
+        # Database-based systems page
+        db_page = QWidget()
+        db_layout = QFormLayout(db_page)
+        
+        self.db_type = QComboBox()
+        self.db_type.addItems(['mysql', 'postgresql', 'sqlite', 'mssql'])
+        db_layout.addRow("Database Type:", self.db_type)
+        
+        self.db_host = QLineEdit()
+        db_layout.addRow("Host:", self.db_host)
+        
+        self.db_port = QSpinBox()
+        self.db_port.setRange(1, 65535)
+        db_layout.addRow("Port:", self.db_port)
+        
+        self.db_name = QLineEdit()
+        db_layout.addRow("Database:", self.db_name)
+        
+        self.system_settings.addWidget(db_page)
+
+    def create_server_tab(self):
+        """Create the server settings tab"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        # Server Connection Group
+        connection_group = QGroupBox("Server Connection")
+        connection_layout = QFormLayout()
         
         # Primary Server
         self.primary_server_host = QLineEdit()
         self.primary_server_port = QSpinBox()
         self.primary_server_port.setRange(1, 65535)
-        self.primary_server_port.setValue(self.config.get('server', {}).get('port', 27000))
         
-        # Add Test Connection button next to Primary Server Host
-        primary_server_layout = QHBoxLayout()
-        primary_server_layout.addWidget(self.primary_server_host)
-        test_connection_btn = QPushButton("Test Connection")
-        test_connection_btn.clicked.connect(self.test_server_connection)
-        primary_server_layout.addWidget(test_connection_btn)
-        
-        server_layout.addRow("Primary Server Host:", primary_server_layout)
-        server_layout.addRow("Primary Server Port:", self.primary_server_port)  # Add this line
-        
-        # Backup Server (Optional)
-        self.backup_server_host = QLineEdit()
-        self.backup_server_port = QSpinBox()
-        self.backup_server_port.setRange(1, 65535)
-        self.backup_server_port.setValue(self.config.get('backup_server', {}).get('port', 27000))
-        
-        server_layout.addRow("Backup Server Host:", self.backup_server_host)
-        server_layout.addRow("Backup Server Port:", self.backup_server_port)
+        connection_layout.addRow("Primary Server Host:", self.primary_server_host)
+        connection_layout.addRow("Primary Server Port:", self.primary_server_port)
         
         # Connection Settings
         self.timeout_spinbox = QSpinBox()
-        self.timeout_spinbox.setRange(1, 300)  # 1-300 seconds
-        self.timeout_spinbox.setValue(self.config.get('connection', {}).get('timeout', 30))
-        server_layout.addRow("Connection Timeout (seconds):", self.timeout_spinbox)
+        self.timeout_spinbox.setRange(1, 300)
+        connection_layout.addRow("Timeout (seconds):", self.timeout_spinbox)
         
         self.retry_spinbox = QSpinBox()
-        self.retry_spinbox.setRange(0, 10)  # 0-10 retries
-        self.retry_spinbox.setValue(self.config.get('connection', {}).get('max_retries', 3))
-        server_layout.addRow("Max Retry Attempts:", self.retry_spinbox)
+        self.retry_spinbox.setRange(0, 10)
+        connection_layout.addRow("Max Retries:", self.retry_spinbox)
         
-        # SSL/TLS Settings
+        connection_group.setLayout(connection_layout)
+        layout.addWidget(connection_group)
+        
+        # Server Security Group
+        security_group = QGroupBox("Security")
+        security_layout = QFormLayout()
+        
         self.use_ssl = QCheckBox("Use SSL/TLS")
-        self.use_ssl.setChecked(self.config.get('connection', {}).get('use_ssl', True))
-        server_layout.addRow("", self.use_ssl)
-        
         self.verify_ssl = QCheckBox("Verify SSL Certificate")
-        self.verify_ssl.setChecked(self.config.get('connection', {}).get('verify_ssl', True))
-        server_layout.addRow("", self.verify_ssl)
         
-        # Custom Certificate Path
+        security_layout.addRow("", self.use_ssl)
+        security_layout.addRow("", self.verify_ssl)
+        
         self.cert_path = QLineEdit()
-        self.cert_path.setText(self.config.get('connection', {}).get('cert_path', ''))
-        cert_browse_btn = QPushButton("Browse...")
-        cert_browse_btn.clicked.connect(self.browse_cert_path)
-        
+        browse_cert_btn = QPushButton("Browse...")
+        browse_cert_btn.clicked.connect(self.browse_cert_path)
         cert_layout = QHBoxLayout()
         cert_layout.addWidget(self.cert_path)
-        cert_layout.addWidget(cert_browse_btn)
-        server_layout.addRow("Custom Certificate Path:", cert_layout)
+        cert_layout.addWidget(browse_cert_btn)
+        security_layout.addRow("Certificate Path:", cert_layout)
         
-        server_group.setLayout(server_layout)
-        layout.addWidget(server_group)
+        security_group.setLayout(security_layout)
+        layout.addWidget(security_group)
         
-        # License File Settings group
-        license_group = QGroupBox("License File Settings")
-        license_layout = QFormLayout()
-        
-        # Default save path
-        self.default_save_path = QLineEdit()
-        self.default_save_path.setText(self.config.get('paths', {}).get('default_save', ''))
-        save_browse_btn = QPushButton("Browse...")
-        save_browse_btn.clicked.connect(self.browse_save_path)
-        
-        save_layout = QHBoxLayout()
-        save_layout.addWidget(self.default_save_path)
-        save_layout.addWidget(save_browse_btn)
-        license_layout.addRow("Default Save Path:", save_layout)
-        
-        license_group.setLayout(license_layout)
-        layout.addWidget(license_group)
-        
-        # Customer Directory Settings
-        customer_group = QGroupBox("Customer Directory Settings")
-        customer_layout = QFormLayout()
-        
-        self.customer_base_path = QLineEdit()
-        self.customer_base_path.setText(self.config.get('paths', {}).get('customer_base', 'customers'))
-        base_browse_btn = QPushButton("Browse...")
-        base_browse_btn.clicked.connect(self.browse_customer_base)
-        
-        base_layout = QHBoxLayout()
-        base_layout.addWidget(self.customer_base_path)
-        base_layout.addWidget(base_browse_btn)
-        customer_layout.addRow("Customer Base Directory:", base_layout)
-        
-        customer_group.setLayout(customer_layout)
-        layout.addWidget(customer_group)
-        
-        widget.setLayout(layout)
         return widget
-        
+
     def create_credentials_tab(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
@@ -321,7 +359,7 @@ class CommonSettingsDialog(QDialog):
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select Default Save Directory",
-            ""
+            self.default_save_path.text() or ""
         )
         if directory:
             self.default_save_path.setText(directory)
@@ -331,7 +369,7 @@ class CommonSettingsDialog(QDialog):
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select Customer Base Directory",
-            self.customer_base_path.text()
+            self.customer_base_path.text() or ""
         )
         if directory:
             self.customer_base_path.setText(directory)
@@ -595,6 +633,78 @@ class CommonSettingsDialog(QDialog):
                 f"Failed to test credentials:\n{str(e)}"
             )
 
+    def create_paths_tab(self):
+        """Create the paths tab"""
+        widget = QWidget()
+        layout = QFormLayout(widget)
+        
+        # License File Settings group
+        license_group = QGroupBox("License File Settings")
+        license_layout = QFormLayout()
+        
+        # Default save path
+        self.default_save_path = QLineEdit()
+        self.default_save_path.setText(self.config.get('paths', {}).get('default_save', ''))
+        save_browse_btn = QPushButton("Browse...")
+        save_browse_btn.clicked.connect(self.browse_save_path)
+        
+        save_layout = QHBoxLayout()
+        save_layout.addWidget(self.default_save_path)
+        save_layout.addWidget(save_browse_btn)
+        license_layout.addRow("Default Save Path:", save_layout)
+        
+        license_group.setLayout(license_layout)
+        layout.addWidget(license_group)
+        
+        # Customer Directory Settings
+        customer_group = QGroupBox("Customer Directory Settings")
+        customer_layout = QFormLayout()
+        
+        self.customer_base_path = QLineEdit()
+        self.customer_base_path.setText(self.config.get('paths', {}).get('customer_base', 'customers'))
+        base_browse_btn = QPushButton("Browse...")
+        base_browse_btn.clicked.connect(self.browse_customer_base)
+        
+        base_layout = QHBoxLayout()
+        base_layout.addWidget(self.customer_base_path)
+        base_layout.addWidget(base_browse_btn)
+        customer_layout.addRow("Customer Base Directory:", base_layout)
+        
+        customer_group.setLayout(customer_layout)
+        layout.addWidget(customer_group)
+        
+        widget.setLayout(layout)
+        return widget
+
+    def on_system_changed(self, index):
+        """Handle license system selection changes"""
+        system_id = self.system_combo.currentData()
+        if not system_id:
+            return
+        
+        system = self.config['license_systems'].get(system_id)
+        if not system:
+            return
+        
+        # Show appropriate settings page based on system type
+        if system.get('system_type') == 'database':
+            self.system_settings.setCurrentIndex(1)  # Database page
+            
+            # Load database settings if they exist
+            db_config = system.get('database_config', {})
+            if db_config:
+                self.db_type.setCurrentText(db_config.get('type', 'mysql'))
+                self.db_host.setText(db_config.get('host', ''))
+                self.db_port.setValue(db_config.get('port', 3306))
+                self.db_name.setText(db_config.get('database', ''))
+                
+        else:  # network or file type
+            self.system_settings.setCurrentIndex(0)  # Network/file page
+            
+            # Load network settings if they exist
+            self.install_path.setText(str(system.get('install_path', '')))
+            self.default_port.setValue(system.get('default_port', 27000))
+
     def accept(self):
         """Save settings when OK is clicked"""
         # Validate primary server host
@@ -609,8 +719,6 @@ class CommonSettingsDialog(QDialog):
         # Update config with new values
         if 'server' not in self.config:
             self.config['server'] = {}
-        if 'backup_server' not in self.config:
-            self.config['backup_server'] = {}
         if 'connection' not in self.config:
             self.config['connection'] = {}
         if 'paths' not in self.config:
@@ -619,9 +727,6 @@ class CommonSettingsDialog(QDialog):
         # Server settings
         self.config['server']['host'] = self.primary_server_host.text()
         self.config['server']['port'] = self.primary_server_port.value()
-        
-        self.config['backup_server']['host'] = self.backup_server_host.text()
-        self.config['backup_server']['port'] = self.backup_server_port.value()
         
         # Connection settings
         self.config['connection'].update({
@@ -634,9 +739,27 @@ class CommonSettingsDialog(QDialog):
         
         # Path settings
         self.config['paths']['default_save'] = self.default_save_path.text()
-        
-        # Update customer base path
         self.config['paths']['customer_base'] = self.customer_base_path.text()
+        
+        # Save license system settings
+        system_id = self.system_combo.currentData()
+        if system_id and system_id in self.config['license_systems']:
+            system = self.config['license_systems'][system_id]
+            
+            if system['system_type'] == 'database':
+                # Update database config
+                if 'database_config' not in system:
+                    system['database_config'] = {}
+                system['database_config'].update({
+                    'type': self.db_type.currentText(),
+                    'host': self.db_host.text(),
+                    'port': self.db_port.value(),
+                    'database': self.db_name.text()
+                })
+            else:
+                # Update network/file config
+                system['install_path'] = self.install_path.text()
+                system['default_port'] = self.default_port.value()
         
         # Validate SSL settings
         if self.use_ssl.isChecked():
@@ -648,8 +771,118 @@ class CommonSettingsDialog(QDialog):
                 )
                 return
         
-        # Load existing values when dialog is created
         super().accept()
 
+    def browse_install_path(self):
+        """Browse for license system installation directory"""
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Installation Directory",
+            self.install_path.text() or ""
+        )
+        if directory:
+            self.install_path.setText(directory)
 
+    def test_system_connection(self):
+        """Test connection to the selected license system"""
+        system_id = self.system_combo.currentData()
+        if not system_id:
+            return
+        
+        system = self.config['license_systems'].get(system_id)
+        if not system:
+            return
+        
+        username = self.system_username.text().strip()
+        password = self.system_password.text()
+        
+        if not username or not password:
+            QMessageBox.warning(
+                self,
+                "Connection Test",
+                "Please enter both username and password."
+            )
+            return
+        
+        try:
+            # Show progress dialog
+            progress = QMessageBox(self)
+            progress.setIcon(QMessageBox.Information)
+            progress.setText(f"Testing connection to {system['name']}...")
+            progress.setStandardButtons(QMessageBox.NoButton)
+            progress.show()
+            
+            if system['system_type'] == 'database':
+                self.test_database_connection(system, username, password)
+            else:  # network or file type
+                self.test_network_connection(system, username, password)
+                
+            progress.hide()
+            
+        except Exception as e:
+            progress.hide()
+            QMessageBox.critical(
+                self,
+                "Connection Test",
+                f"Connection failed:\n{str(e)}"
+            )
 
+    def test_database_connection(self, system, username, password):
+        """Test database connection"""
+        db_config = system.get('database_config', {})
+        if not db_config:
+            raise ValueError("No database configuration found")
+        
+        if db_config['type'] == 'mysql':
+            import mysql.connector
+            conn = mysql.connector.connect(
+                host=db_config['host'],
+                port=db_config['port'],
+                database=db_config['database'],
+                user=username,
+                password=password
+            )
+            conn.close()
+            
+        elif db_config['type'] == 'postgresql':
+            import psycopg2
+            conn = psycopg2.connect(
+                host=db_config['host'],
+                port=db_config['port'],
+                dbname=db_config['database'],
+                user=username,
+                password=password
+            )
+            conn.close()
+            
+        # Add other database types as needed
+        
+        QMessageBox.information(
+            self,
+            "Connection Test",
+            f"Successfully connected to {system['name']}"
+        )
+
+    def test_network_connection(self, system, username, password):
+        """Test network connection"""
+        import socket
+        import ssl
+        
+        host = system.get('install_path', 'localhost')
+        port = system.get('default_port', 27000)
+        
+        # Create socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)  # 5 second timeout
+        
+        try:
+            # Connect to server
+            sock.connect((host, port))
+            sock.close()
+            QMessageBox.information(
+                self,
+                "Connection Test",
+                f"Successfully connected to {system['name']}"
+            )
+        except Exception as e:
+            raise Exception(f"Failed to connect: {str(e)}")

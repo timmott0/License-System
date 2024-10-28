@@ -31,6 +31,7 @@ class LicenseType(Enum):
     FLOATING = "Floating License"
     CONCURRENT = "Concurrent License"
     NODELOCK = "Node-Locked License"
+    SQL = "SQL Database License"  # Add this line
 
 class BaseLicenseGenerator:
     """Base class for all license generators"""
@@ -108,6 +109,10 @@ class LicenseFrame(QFrame):
             public_key_path=key_paths.get('public_key_path')
         )
         self.signer = LicenseSigner(self.key_manager)
+        
+        # Create SQL options widget
+        self.sql_options = self.create_sql_options()
+        self.sql_options.setVisible(False)  # Hide by default
         
         self.setup_ui()
         
@@ -242,16 +247,20 @@ class LicenseFrame(QFrame):
         self.maintenance_date.setDate(QDate.currentDate().addMonths(3))
         layout.addWidget(self.maintenance_date, 3, 1)
         
-        # License System (FlexLM, HASP, etc.)
+        # License System (FlexLM, HASP, SQL, etc.)
         layout.addWidget(QLabel("License System:"), 4, 0)
         self.license_system_combo = QComboBox()
-        if self.config:
-            license_systems = self.config.get('license_systems', {})
-            for system_id, system in license_systems.items():
-                if system.get('enabled', True):
-                    self.license_system_combo.addItem(system['name'], system_id)
+        self.populate_license_systems()  # Add this method call
         layout.addWidget(self.license_system_combo, 4, 1)
         
+        # Add this line to connect the change event
+        self.license_system_combo.currentIndexChanged.connect(self.on_license_system_changed)
+        
+        # Add SQL-specific options container
+        self.sql_options = self.create_sql_options()
+        self.sql_options.setVisible(False)  # Hide by default
+        layout.addWidget(self.sql_options, 5, 0, 1, 2)
+
         group.setLayout(layout)
         return group
         
@@ -538,18 +547,16 @@ class LicenseFrame(QFrame):
     def on_license_system_changed(self, index):
         """Handle license system selection change"""
         system_id = self.license_system_combo.currentData()
-        if system_id:
-            system = self.config['license_systems'][system_id]
-            # Update port
-            self.flexlm_port.setValue(system['default_port'])  # Correct attribute
-            # Update other fields based on selected system
-            if system_id == 'flexlm':
-                self.flexlm_vendor.setText('fe')
-                self.flexlm_options.setText('ewew')
-            elif system_id == 'sentinel':
-                self.hasp_vendor_code.setText('hasp')
-                self.hasp_feature_id.setValue(1)
-            # Add other systems if necessary
+        
+        if system_id == 'mysql_licenses':
+            # Use database settings from config
+            db_config = self.config.get('database', {})
+            self.sql_host.setText(db_config.get('host', 'localhost'))
+            self.sql_port.setValue(db_config.get('port', 3306))
+            self.sql_database.setText(db_config.get('database', 'licenses'))
+            self.sql_username.setText(db_config.get('username', ''))
+        else:
+            self.sql_options.setVisible(False)
 
     def save_license(self, license_data: str, license_system: str):
         """Save the license file with the appropriate extension"""
@@ -913,6 +920,41 @@ class LicenseFrame(QFrame):
     def get_products(self) -> List[Product]:
         """Get selected products for the license"""
         return self.get_selected_products()
+
+    def create_sql_options(self):
+        """Create SQL-specific options widget"""
+        widget = QWidget()
+        layout = QFormLayout(widget)
+        
+        self.sql_host = QLineEdit()
+        layout.addRow("Database Host:", self.sql_host)
+        
+        self.sql_port = QSpinBox()
+        self.sql_port.setRange(1, 65535)
+        self.sql_port.setValue(3306)  # Default MySQL port
+        layout.addRow("Database Port:", self.sql_port)
+        
+        self.sql_database = QLineEdit()
+        layout.addRow("Database Name:", self.sql_database)
+        
+        self.sql_username = QLineEdit()
+        layout.addRow("Username:", self.sql_username)
+        
+        widget.setLayout(layout)
+        return widget
+
+    def populate_license_systems(self):
+        """Populate the license systems combo box"""
+        self.license_system_combo.clear()
+        if self.config and 'license_systems' in self.config:
+            for system_id, system in self.config['license_systems'].items():
+                if system.get('enabled', True):
+                    self.license_system_combo.addItem(system['name'], system_id)
+
+
+
+
+
 
 
 

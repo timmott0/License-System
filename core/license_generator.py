@@ -23,6 +23,7 @@ class LicenseType(Enum):
     FLOATING = "Floating License"
     CONCURRENT = "Concurrent License"
     NODELOCK = "Node-Locked License"
+    SQL = "SQL Database License"
 
 class LicenseGeneratorFactory:
     """Factory to create appropriate license generator based on type"""
@@ -39,6 +40,8 @@ class LicenseGeneratorFactory:
             return NodeLockedGenerator(signer)
         elif license_type == LicenseType.FLOATING:
             return FloatingLicenseGenerator(signer)
+        elif license_type == LicenseType.SQL:  # Add this case
+            return SQLLicenseGenerator(signer)
         else:
             raise ValueError(f"Unsupported license type: {license_type}")
 
@@ -131,3 +134,23 @@ class FloatingLicenseGenerator(BaseLicenseGenerator):
         return self.signer.sign_license_data(license_data)
 
 # Add other generator implementations After Matt shows me how to do it
+
+# Add this class after your other generator classes
+class SQLLicenseGenerator(BaseLicenseGenerator):
+    def generate_license(self, customer_info: Dict, license_info: Dict, 
+                        products: List, host_info: Dict) -> str:
+        """Generate SQL-based license"""
+        license_data = {
+            "type": "sql",
+            "customer": customer_info,
+            "license": license_info,
+            "products": [p.to_dict() for p in products],
+            "host": host_info,
+            "database_config": license_info.get('database_config', {})
+        }
+        return self.signer.sign_license_data(license_data)
+
+    def save_license(self, license_data: str, db_config: DatabaseConfig):
+        """Save license to SQL database"""
+        # Implementation will depend on your database structure
+        pass
