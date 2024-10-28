@@ -12,6 +12,82 @@ import shutil
 import logging
 from typing import Dict, Optional
 from core.key_manager import KeyManager
+from config.security_settings import KeySettings, DEFAULT_SECURITY_SETTINGS
+
+class SecuritySettingsDialog(tk.Toplevel):
+    def __init__(self, parent, current_settings=None):
+        super().__init__(parent)
+        self.title("Security Settings")
+        self.settings = current_settings or DEFAULT_SECURITY_SETTINGS
+        self.result = None
+        self.setup_ui()
+
+    def setup_ui(self):
+        main_frame = ttk.Frame(self, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        # Key Length
+        ttk.Label(main_frame, text="Key Length:").grid(row=0, column=0, pady=5)
+        self.key_length = ttk.Combobox(main_frame, values=[2048, 3072, 4096])
+        self.key_length.set(self.settings['key_settings']['key_length'])
+        self.key_length.grid(row=0, column=1, pady=5)
+
+        # Key Format
+        ttk.Label(main_frame, text="Key Format:").grid(row=1, column=0, pady=5)
+        self.key_format = ttk.Combobox(main_frame, values=['PKCS8', 'PKCS1'])
+        self.key_format.set(self.settings['key_settings']['key_format'])
+        self.key_format.grid(row=1, column=1, pady=5)
+
+        # Encryption
+        self.encryption_enabled = tk.BooleanVar(value=self.settings['key_settings']['encryption_enabled'])
+        ttk.Checkbutton(main_frame, text="Enable Key Encryption", 
+                       variable=self.encryption_enabled).grid(row=2, column=0, columnspan=2, pady=5)
+
+        # Backup Settings
+        self.backup_enabled = tk.BooleanVar(value=self.settings['key_settings']['backup_enabled'])
+        ttk.Checkbutton(main_frame, text="Enable Key Backup", 
+                       variable=self.backup_enabled).grid(row=3, column=0, columnspan=2, pady=5)
+
+        # Backup Location
+        ttk.Label(main_frame, text="Backup Location:").grid(row=4, column=0, pady=5)
+        self.backup_location = ttk.Entry(main_frame)
+        self.backup_location.insert(0, self.settings['key_settings']['backup_location'])
+        self.backup_location.grid(row=4, column=1, pady=5)
+
+        # Rotation Period
+        ttk.Label(main_frame, text="Key Rotation (days):").grid(row=5, column=0, pady=5)
+        self.rotation_period = ttk.Entry(main_frame)
+        self.rotation_period.insert(0, str(self.settings['key_settings']['rotation_period_days']))
+        self.rotation_period.grid(row=5, column=1, pady=5)
+
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=6, column=0, columnspan=2, pady=10)
+        ttk.Button(button_frame, text="Save", command=self.save_settings).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(side=tk.LEFT, padx=5)
+
+    def save_settings(self):
+        self.result = {
+            'key_settings': {
+                'key_length': int(self.key_length.get()),
+                'key_format': self.key_format.get(),
+                'encryption_enabled': self.encryption_enabled.get(),
+                'backup_enabled': self.backup_enabled.get(),
+                'backup_location': self.backup_location.get(),
+                'rotation_period_days': int(self.rotation_period.get()),
+                'public_exponent': 65537
+            },
+            'validation': {
+                'enforce_key_length': True,
+                'minimum_key_length': 2048,
+                'require_password': self.encryption_enabled.get()
+            }
+        }
+        self.destroy()
+
+    def cancel(self):
+        self.result = None
+        self.destroy()
 
 class KeyManagementDashboard:
     def __init__(self, root):
@@ -67,6 +143,8 @@ class KeyManagementDashboard:
         ttk.Button(actions_frame, text="Import New Key", command=self.import_key).grid(row=0, column=0, padx=5)
         ttk.Button(actions_frame, text="Validate Keys", command=self.validate_keys).grid(row=0, column=1, padx=5)
         ttk.Button(actions_frame, text="Backup Keys", command=self.backup_keys).grid(row=0, column=2, padx=5)
+        ttk.Button(actions_frame, text="Security Settings", 
+                  command=self.show_security_settings).grid(row=0, column=3, padx=5)
         
         # Status Section
         self.status_var = tk.StringVar()
@@ -188,6 +266,44 @@ class KeyManagementDashboard:
                 self.status_var.set(f"Successfully backed up {backed_up} keys to {backup_path}")
             except Exception as e:
                 messagebox.showerror("Backup Error", f"Failed to backup keys: {e}")
+
+    def show_security_settings(self):
+        """Show the security settings dialog"""
+        try:
+            current_settings = self.load_security_settings()
+            dialog = SecuritySettingsDialog(self.root, current_settings)
+            self.root.wait_window(dialog)
+            
+            if dialog.result:
+                self.save_security_settings(dialog.result)
+                messagebox.showinfo("Success", "Security settings updated successfully")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to update security settings: {str(e)}")
+
+    def load_security_settings(self):
+        """Load security settings from file"""
+        try:
+            settings_path = Path('config/security_settings.json')
+            if settings_path.exists():
+                with open(settings_path) as f:
+                    return json.load(f)
+        except Exception as e:
+            logging.error(f"Failed to load security settings: {e}")
+        return DEFAULT_SECURITY_SETTINGS
+
+    def save_security_settings(self, settings):
+        """Save security settings to file"""
+        try:
+            settings_path = Path('config/security_settings.json')
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(settings_path, 'w') as f:
+                json.dump(settings, f, indent=4)
+                
+        except Exception as e:
+            logging.error(f"Failed to save security settings: {e}")
+            raise
 
 def main():
     root = tk.Tk()

@@ -29,15 +29,25 @@ class LicenseSystemsDialog(QDialog):
             self.system_combo.addItem(system['name'], system_id)
         system_layout.addRow("License System:", self.system_combo)
         
-        # Enable/Disable checkbox
-        self.enabled_checkbox = QCheckBox("Enabled")
-        system_layout.addRow("", self.enabled_checkbox)
+        # Server settings for custom types
+        self.server_group = QGroupBox("Server Settings")
+        server_layout = QFormLayout()
         
-        # Description label
-        self.description_label = QLabel()
-        system_layout.addRow("Description:", self.description_label)
+        self.server_host = QLineEdit()
+        self.server_port = QSpinBox()
+        self.server_port.setRange(1, 65535)
         
-        layout.addLayout(system_layout)
+        server_layout.addRow("Host:", self.server_host)
+        server_layout.addRow("Port:", self.server_port)
+        
+        # SSL settings
+        self.use_ssl = QCheckBox("Use SSL/TLS")
+        self.verify_ssl = QCheckBox("Verify SSL Certificate")
+        server_layout.addRow("", self.use_ssl)
+        server_layout.addRow("", self.verify_ssl)
+        
+        self.server_group.setLayout(server_layout)
+        layout.addWidget(self.server_group)
         
         # Credentials group
         credentials_group = QGroupBox("Credentials")
@@ -65,75 +75,81 @@ class LicenseSystemsDialog(QDialog):
         
         # Connect signals
         self.system_combo.currentIndexChanged.connect(self.update_system_info)
+        self.use_ssl.toggled.connect(self.on_ssl_toggled)
+        
         self.update_system_info()
 
     def accept(self):
         """Save settings when OK is clicked"""
         system_id = self.system_combo.currentData()
         if not system_id:
-            QMessageBox.warning(
-                self,
-                "Validation Error",
-                "Please select a license system."
-            )
+            QMessageBox.warning(self, "Error", "Please select a license system")
             return
-
-        # Update system configuration
-        system_data = self.config['license_systems'][system_id]
-        system_data['enabled'] = self.enabled_checkbox.isChecked()
         
-        # Handle credentials
-        if self.save_credentials_cb.isChecked():
-            if not self.username_edit.text().strip():
-                QMessageBox.warning(
-                    self,
-                    "Validation Error",
-                    "Please enter a username."
-                )
+        system = self.config['license_systems'][system_id]
+        
+        # Save custom server settings
+        if system.get('system_type') == 'custom':
+            host = self.server_host.text().strip()
+            if not host:
+                QMessageBox.warning(self, "Error", "Please enter a server host")
                 return
             
-            # Save credentials securely using keyring
+            system['host'] = host
+            system['default_port'] = self.server_port.value()
+            system['use_ssl'] = self.use_ssl.isChecked()
+            system['verify_ssl'] = self.verify_ssl.isChecked()
+        
+        # Save credentials if checked
+        if self.save_credentials_cb.isChecked():
+            if not self.username_edit.text().strip():
+                QMessageBox.warning(self, "Error", "Please enter a username")
+                return
+                
             import keyring
+            host = system.get('host', '')
             keyring.set_password(
                 "license_manager",
-                f"{system_id}_username",
+                f"{host}_username",
                 self.username_edit.text()
             )
             keyring.set_password(
                 "license_manager",
-                f"{system_id}_password",
+                f"{host}_password",
                 self.password_edit.text()
             )
-        else:
-            # Remove any saved credentials
-            import keyring
-            try:
-                keyring.delete_password("license_manager", f"{system_id}_username")
-                keyring.delete_password("license_manager", f"{system_id}_password")
-            except keyring.errors.PasswordDeleteError:
-                pass  # No saved credentials to delete
         
         super().accept()
 
     def update_system_info(self):
-        """Update UI with system info and load saved credentials"""
+        """Update UI based on selected system"""
         system_id = self.system_combo.currentData()
         if system_id:
-            system_data = self.config['license_systems'].get(system_id, {})
-            self.enabled_checkbox.setChecked(system_data.get('enabled', False))
-            self.description_label.setText(system_data.get('description', ''))
-            print(f"Updated status for system {system_id}: {system_data}")
+            system = self.config['license_systems'].get(system_id, {})
             
-            # Load saved credentials if they exist
-            import keyring
-            saved_username = keyring.get_password("license_manager", f"{system_id}_username")
-            saved_password = keyring.get_password("license_manager", f"{system_id}_password")
+            # Show/hide server settings based on type
+            is_custom = system.get('system_type') == 'custom'
+            self.server_group.setVisible(is_custom)
             
-            if saved_username and saved_password:
-                self.username_edit.setText(saved_username)
-                self.password_edit.setText(saved_password)
-                self.save_credentials_cb.setChecked(True)
-            else:
-                self.username_edit.clear()
-                self.password_edit.clear()
-                self.save_credentials_cb.setChecked(False)
+            # Load saved settings
+            if is_custom:
+                self.server_host.setText(system.get('host', ''))
+                self.server_port.setValue(system.get('default_port', 5001))
+                self.use_ssl.setChecked(system.get('use_ssl', True))
+                self.verify_ssl.setChecked(system.get('verify_ssl', False))
+            
+            # Load saved credentials
+            if system.get('host'):
+                import keyring
+                username = keyring.get_password("license_manager", f"{system['host']}_username")
+                password = keyring.get_password("license_manager", f"{system['host']}_password")
+                if username and password:
+                    self.username_edit.setText(username)
+                    self.password_edit.setText(password)
+                    self.save_credentials_cb.setChecked(True)
+
+    def on_ssl_toggled(self, checked):
+        """Handle SSL checkbox state changes"""
+        self.verify_ssl.setEnabled(checked)
+        if not checked:
+            self.verify_ssl.setChecked(False)

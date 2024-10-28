@@ -11,6 +11,10 @@ import ssl
 from urllib.parse import urlparse
 import requests
 from requests.auth import HTTPBasicAuth
+from urllib3.exceptions import InsecureRequestWarning
+import keyring
+import warnings
+from requests.exceptions import SSLError
 
 class CommonSettingsDialog(QDialog):
     def __init__(self, config, parent=None):
@@ -75,20 +79,6 @@ class CommonSettingsDialog(QDialog):
             self.system_combo.addItem(system['name'], system_id)
         self.system_combo.currentIndexChanged.connect(self.on_system_changed)
         systems_layout.addWidget(self.system_combo)
-        
-        # Credentials Group
-        creds_group = QGroupBox("System Credentials")
-        creds_layout = QFormLayout()
-        
-        self.system_username = QLineEdit()
-        self.system_password = QLineEdit()
-        self.system_password.setEchoMode(QLineEdit.Password)
-        
-        creds_layout.addRow("Username:", self.system_username)
-        creds_layout.addRow("Password:", self.system_password)
-        
-        creds_group.setLayout(creds_layout)
-        systems_layout.addWidget(creds_group)
         
         # System-specific settings container
         self.system_settings = QStackedWidget()
@@ -156,8 +146,15 @@ class CommonSettingsDialog(QDialog):
         self.primary_server_port = QSpinBox()
         self.primary_server_port.setRange(1, 65535)
         
+        # Add server credentials fields
+        self.primary_server_username = QLineEdit()
+        self.primary_server_password = QLineEdit()
+        self.primary_server_password.setEchoMode(QLineEdit.Password)
+        
         connection_layout.addRow("Primary Server Host:", self.primary_server_host)
         connection_layout.addRow("Primary Server Port:", self.primary_server_port)
+        connection_layout.addRow("Username:", self.primary_server_username)
+        connection_layout.addRow("Password:", self.primary_server_password)
         
         # Connection Settings
         self.timeout_spinbox = QSpinBox()
@@ -391,77 +388,68 @@ class CommonSettingsDialog(QDialog):
             self.cert_path.clear()
 
     def test_server_connection(self):
-        """Test basic connectivity to server"""
+        """Test connection to server with authentication"""
         host = self.primary_server_host.text().strip()
         port = self.primary_server_port.value()
+        username = self.primary_server_username.text()  # Updated field name
+        password = self.primary_server_password.text()  # Updated field name
         
-        if not host:
-            QMessageBox.warning(
-                self,
-                "Validation Error",
-                "Please enter a server host address."
-            )
-            return
-
-        if not isinstance(port, int) or not (1 <= port <= 65535):
-            QMessageBox.warning(
-                self,
-                "Validation Error",
-                "Port must be a number between 1 and 65535."
-            )
-            return
-
         try:
-            # Create a progress dialog
-            progress = QMessageBox(self)
-            progress.setIcon(QMessageBox.Information)
-            progress.setText(f"Testing connection to {host}:{port}...")
-            progress.setStandardButtons(QMessageBox.NoButton)
-            progress.show()
+            session = requests.Session()
+            base_url = f"{'https' if self.use_ssl.isChecked() else 'http'}://{host}:{port}"
+            
+            captured_warnings = []
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                
+                try:
+                    # Test authentication
+                    auth_url = f"{base_url}/webapi/auth.cgi"
+                    auth_params = {
+                        'api': 'SYNO.API.Auth',
+                        'version': '3',
+                        'method': 'login',
+                        'account': username,
+                        'passwd': password,
+                        'session': 'FileStation',
+                        'format': 'cookie'
+                    }
+                    
+                    auth_response = session.get(auth_url, params=auth_params)
+                    auth_data = auth_response.json()
+                    
+                    # Collect warnings
+                    captured_warnings = [str(warning.message) for warning in w]
+                    
+                    # Create message
+                    message = f"Connection to {host}:{port} successful\n"
+                    message += f"Authentication: {'Successful' if auth_data.get('success') else 'Failed'}\n"
+                    if captured_warnings:
+                        message += "\nWarnings:\n" + "\n".join(captured_warnings)
+                    
+                    QMessageBox.information(
+                        self,
+                        "Connection Test",
+                        message
+                    )
 
-            # Create socket
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(self.timeout_spinbox.value())
-
-            try:
-                # Try to resolve hostname first
-                ip_address = socket.gethostbyname(host)
-                print(f"Resolved {host} to {ip_address}")
-            except socket.gaierror:
-                progress.hide()
-                QMessageBox.critical(
-                    self,
-                    "Connection Test",
-                    f"Could not resolve hostname: {host}\nPlease verify the hostname/IP is correct."
-                )
-                return
-
-            # Try to connect
-            try:
-                sock.connect((ip_address, port))
-                print(f"Successfully connected to {host}:{port}")
-                progress.hide()
-                QMessageBox.information(
-                    self,
-                    "Connection Test",
-                    f"Successfully connected to {host}:{port}"
-                )
-            except ConnectionRefusedError:
-                progress.hide()
-                QMessageBox.critical(
-                    self,
-                    "Connection Error",
-                    f"Connection refused. Please verify:\n"
-                    f"1. Port {port} is open on {host}\n"
-                    f"2. The service is running\n"
-                    f"3. Firewall allows the connection"
-                )
-            finally:
-                sock.close()
-
+                except requests.exceptions.SSLError as e:
+                    QMessageBox.warning(
+                        self,
+                        "SSL Warning",
+                        f"SSL Certificate Verification Failed:\n{str(e)}\n\n"
+                        "If using a self-signed certificate, you may need to:\n"
+                        "1. Disable SSL verification, or\n"
+                        "2. Add your certificate to the trusted certificates"
+                    )
+                except Exception as e:
+                    QMessageBox.critical(
+                        self,
+                        "Connection Error",
+                        f"Failed to connect:\n{str(e)}"
+                    )
+        
         except Exception as e:
-            if 'progress' in locals():
-                progress.hide()
             QMessageBox.critical(
                 self,
                 "Error",
@@ -795,8 +783,12 @@ class CommonSettingsDialog(QDialog):
             self.config['paths'] = {}
         
         # Server settings
-        self.config['server']['host'] = self.primary_server_host.text()
-        self.config['server']['port'] = self.primary_server_port.value()
+        self.config['server'].update({
+            'host': self.primary_server_host.text(),
+            'port': self.primary_server_port.value(),
+            'username': self.primary_server_username.text(),
+            'password': self.primary_server_password.text()
+        })
         
         # Connection settings
         self.config['connection'].update({
@@ -960,6 +952,8 @@ class CommonSettingsDialog(QDialog):
             )
         except Exception as e:
             raise Exception(f"Failed to connect: {str(e)}")
+
+
 
 
 

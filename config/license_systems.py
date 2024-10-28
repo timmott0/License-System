@@ -20,6 +20,10 @@ class LicenseSystem:
     default_port: Optional[int] = None
     description: str = ''
     database_config: Optional[DatabaseConfig] = None
+    use_ssl: bool = False
+    verify_ssl: bool = False
+    cert_path: Optional[Path] = None
+    server_type: Optional[str] = None
 
 # Define default license systems
 DEFAULT_SYSTEMS = {
@@ -58,5 +62,15 @@ DEFAULT_SYSTEMS = {
         install_path=Path('vendor/custom'),
         default_port=8080,
         description='Custom implementation of license server'
+    ),
+    'synology': LicenseSystem(
+        name='Synology License Server',
+        enabled=True,
+        system_type='custom',
+        default_port=5001,
+        description='Synology NAS License Server',
+        use_ssl=True,
+        verify_ssl=False,
+        server_type='synology'
     )
 }

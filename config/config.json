@@ -3,9 +3,10 @@
         "flexlm": {
             "name": "FlexLM",
             "enabled": true,
-            "install_path": "vendor\\flexlm",
-            "default_port": 27000,
-            "description": "Flexible License Manager by Flexera"
+            "install_path": "",
+            "default_port": 1,
+            "description": "Flexible License Manager by Flexera",
+            "system_type": "network"
         },
         "hasp": {
             "name": "Sentinel HASP",
@@ -18,8 +19,9 @@
             "name": "Custom License Server",
             "enabled": true,
             "install_path": "vendor\\custom",
-            "default_port": 8080,
-            "description": "Custom implementation of license server"
+            "default_port": 5001,
+            "description": "Custom implementation of license server",
+            "system_type": "network"
         },
         "mysql_licenses": {
             "name": "MySQL License Database",
@@ -54,7 +56,7 @@
     },
     "connection": {
         "timeout": 30,
-        "max_retries": 3,
+        "max_retries": 0,
         "use_ssl": true,
         "verify_ssl": false,
         "cert_path": ""
