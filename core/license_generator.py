@@ -9,6 +9,7 @@ from enum import Enum
 # Local imports
 from .product import Product
 from encryption.license_signing import LicenseSigner
+from config.license_systems import DatabaseConfig
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)

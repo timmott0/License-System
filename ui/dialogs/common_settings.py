@@ -355,9 +355,66 @@ class CommonSettingsDialog(QDialog):
             self.cert_path.clear()
 
     def test_server_connection(self):
-        """Test connection to the primary server"""
+        """Test connection to server or database"""
         host = self.primary_server_host.text().strip()
         port = self.primary_server_port.value()
+        
+        # Get the current license system type
+        system_id = self.system_combo.currentData()
+        system_data = self.config['license_systems'].get(system_id, {})
+        
+        if system_data.get('system_type') == 'database':
+            self.test_database_connection(host, port, system_data.get('database_config', {}))
+        else:
+            self.test_network_connection(host, port)
+
+    def test_database_connection(self, host, port, db_config):
+        """Test database connection"""
+        try:
+            # Create progress dialog
+            progress = QMessageBox(self)
+            progress.setIcon(QMessageBox.Information)
+            progress.setText(f"Testing database connection...")
+            progress.setStandardButtons(QMessageBox.NoButton)
+            progress.show()
+
+            # Import appropriate database driver
+            if db_config['type'] == 'mysql':
+                import mysql.connector
+                conn = mysql.connector.connect(
+                    host=host,
+                    port=port,
+                    database=db_config['database'],
+                    user=db_config['username']
+                )
+            elif db_config['type'] == 'postgresql':
+                import psycopg2
+                conn = psycopg2.connect(
+                    host=host,
+                    port=port,
+                    dbname=db_config['database'],
+                    user=db_config['username']
+                )
+            # ... handle other database types
+
+            conn.close()
+            progress.hide()
+            QMessageBox.information(
+                self,
+                "Connection Test",
+                "Successfully connected to database"
+            )
+
+        except Exception as e:
+            progress.hide()
+            QMessageBox.critical(
+                self,
+                "Connection Test",
+                f"Database connection failed:\n{str(e)}"
+            )
+
+    def test_network_connection(self, host, port):
+        """Test network connection"""
         timeout = self.timeout_spinbox.value()
         use_ssl = self.use_ssl.isChecked()
 
@@ -593,5 +650,6 @@ class CommonSettingsDialog(QDialog):
         
         # Load existing values when dialog is created
         super().accept()
+
 
 

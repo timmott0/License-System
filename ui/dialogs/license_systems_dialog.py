@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                           QComboBox, QCheckBox, QPushButton, QFormLayout)
+                           QComboBox, QCheckBox, QPushButton, QFormLayout, QGroupBox, QLineEdit, QSpinBox)
 from PyQt5.QtCore import Qt, QSize
 import sys
 import os
@@ -71,6 +71,28 @@ class LicenseSystemsDialog(QDialog):
         self.description_label.setWordWrap(True)
         form_layout.addRow("Description:", self.description_label)
         
+        # Add database configuration section
+        self.db_config_group = QGroupBox("Database Configuration")
+        self.db_config_group.setVisible(False)  # Hide by default
+        db_layout = QFormLayout()
+        
+        self.db_type_combo = QComboBox()
+        self.db_type_combo.addItems(['mysql', 'postgresql', 'sqlite', 'mssql'])
+        self.db_host = QLineEdit()
+        self.db_port = QSpinBox()
+        self.db_port.setRange(1, 65535)
+        self.db_name = QLineEdit()
+        self.db_user = QLineEdit()
+        
+        db_layout.addRow("Database Type:", self.db_type_combo)
+        db_layout.addRow("Host:", self.db_host)
+        db_layout.addRow("Port:", self.db_port)
+        db_layout.addRow("Database Name:", self.db_name)
+        db_layout.addRow("Username:", self.db_user)
+        
+        self.db_config_group.setLayout(db_layout)
+        layout.addWidget(self.db_config_group)
+        
         # Add form layout to main layout
         layout.addLayout(form_layout)
         
@@ -97,6 +119,9 @@ class LicenseSystemsDialog(QDialog):
         self.system_combo.currentIndexChanged.connect(self.update_system_status)
         self.update_system_status()  # Initialize with current selection
         
+        # Connect system type changes
+        self.system_combo.currentIndexChanged.connect(self.on_system_changed)
+
     def update_system_status(self):
         system_id = self.system_combo.currentData()
         if system_id:
@@ -104,3 +129,10 @@ class LicenseSystemsDialog(QDialog):
             self.enabled_checkbox.setChecked(system_data.get('enabled', False))
             self.description_label.setText(system_data.get('description', ''))
             print(f"Updated status for system {system_id}: {system_data}")
+
+    def on_system_changed(self):
+        system_id = self.system_combo.currentData()
+        if system_id:
+            system_data = self.config['license_systems'][system_id]
+            is_database = system_data.get('system_type') == 'database'
+            self.db_config_group.setVisible(is_database)
