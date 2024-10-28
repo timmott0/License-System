@@ -87,13 +87,6 @@ class CommonSettingsDialog(QDialog):
         creds_layout.addRow("Username:", self.system_username)
         creds_layout.addRow("Password:", self.system_password)
         
-        # Test Connection button
-        test_btn_layout = QHBoxLayout()
-        test_connection_btn = QPushButton("Test Connection")
-        test_connection_btn.clicked.connect(self.test_system_connection)
-        test_btn_layout.addWidget(test_connection_btn)
-        creds_layout.addRow("", test_btn_layout)
-        
         creds_group.setLayout(creds_layout)
         systems_layout.addWidget(creds_group)
         
@@ -174,6 +167,11 @@ class CommonSettingsDialog(QDialog):
         self.retry_spinbox = QSpinBox()
         self.retry_spinbox.setRange(0, 10)
         connection_layout.addRow("Max Retries:", self.retry_spinbox)
+        
+        # Add Test Connection button to connection group
+        test_connection_btn = QPushButton("Test Connection")
+        test_connection_btn.clicked.connect(self.test_server_connection)
+        connection_layout.addRow("", test_connection_btn)
         
         connection_group.setLayout(connection_layout)
         layout.addWidget(connection_group)
@@ -393,18 +391,82 @@ class CommonSettingsDialog(QDialog):
             self.cert_path.clear()
 
     def test_server_connection(self):
-        """Test connection to server or database"""
+        """Test basic connectivity to server"""
         host = self.primary_server_host.text().strip()
         port = self.primary_server_port.value()
         
-        # Get the current license system type
-        system_id = self.system_combo.currentData()
-        system_data = self.config['license_systems'].get(system_id, {})
-        
-        if system_data.get('system_type') == 'database':
-            self.test_database_connection(host, port, system_data.get('database_config', {}))
-        else:
-            self.test_network_connection(host, port)
+        if not host:
+            QMessageBox.warning(
+                self,
+                "Validation Error",
+                "Please enter a server host address."
+            )
+            return
+
+        if not isinstance(port, int) or not (1 <= port <= 65535):
+            QMessageBox.warning(
+                self,
+                "Validation Error",
+                "Port must be a number between 1 and 65535."
+            )
+            return
+
+        try:
+            # Create a progress dialog
+            progress = QMessageBox(self)
+            progress.setIcon(QMessageBox.Information)
+            progress.setText(f"Testing connection to {host}:{port}...")
+            progress.setStandardButtons(QMessageBox.NoButton)
+            progress.show()
+
+            # Create socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(self.timeout_spinbox.value())
+
+            try:
+                # Try to resolve hostname first
+                ip_address = socket.gethostbyname(host)
+                print(f"Resolved {host} to {ip_address}")
+            except socket.gaierror:
+                progress.hide()
+                QMessageBox.critical(
+                    self,
+                    "Connection Test",
+                    f"Could not resolve hostname: {host}\nPlease verify the hostname/IP is correct."
+                )
+                return
+
+            # Try to connect
+            try:
+                sock.connect((ip_address, port))
+                print(f"Successfully connected to {host}:{port}")
+                progress.hide()
+                QMessageBox.information(
+                    self,
+                    "Connection Test",
+                    f"Successfully connected to {host}:{port}"
+                )
+            except ConnectionRefusedError:
+                progress.hide()
+                QMessageBox.critical(
+                    self,
+                    "Connection Error",
+                    f"Connection refused. Please verify:\n"
+                    f"1. Port {port} is open on {host}\n"
+                    f"2. The service is running\n"
+                    f"3. Firewall allows the connection"
+                )
+            finally:
+                sock.close()
+
+        except Exception as e:
+            if 'progress' in locals():
+                progress.hide()
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"An unexpected error occurred:\n{str(e)}"
+            )
 
     def test_database_connection(self, host, port, db_config):
         """Test database connection"""
@@ -451,22 +513,31 @@ class CommonSettingsDialog(QDialog):
                 f"Database connection failed:\n{str(e)}"
             )
 
-    def test_network_connection(self, host, port):
-        """Test network connection"""
-        timeout = self.timeout_spinbox.value()
-        use_ssl = self.use_ssl.isChecked()
-
-        if not host:
+    def test_network_connection(self, host, port, username=None, password=None):
+        """Test network connection
+        
+        Args:
+            host (str): The host to connect to
+            port (int): The port to connect to
+            username (str, optional): Username for authentication
+            password (str, optional): Password for authentication
+        """
+        # Input validation
+        if not isinstance(host, str) or not host.strip():
             QMessageBox.warning(
                 self,
-                "Connection Test",
-                "Please enter a server host address."
+                "Validation Error",
+                "Invalid host address."
             )
             return
 
-        # Add debug message
-        print(f"Attempting to connect to {host}:{port}")
-        print(f"SSL Enabled: {use_ssl}")
+        if not isinstance(port, int) or not (1 <= port <= 65535):
+            QMessageBox.warning(
+                self,
+                "Validation Error",
+                "Port must be a number between 1 and 65535."
+            )
+            return
 
         try:
             # Create a progress dialog
@@ -475,68 +546,67 @@ class CommonSettingsDialog(QDialog):
             progress.setText(f"Testing connection to {host}:{port}...")
             progress.setStandardButtons(QMessageBox.NoButton)
             progress.show()
-            
-            # Create socket
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(timeout)
 
-            # Try to resolve hostname first
             try:
-                ip_address = socket.gethostbyname(host)
-                print(f"Resolved {host} to {ip_address}")
-            except socket.gaierror:
-                progress.hide()
-                QMessageBox.critical(
-                    self,
-                    "Connection Test",
-                    f"Could not resolve hostname: {host}\nPlease verify the hostname/IP is correct."
-                )
-                return
+                # Create socket
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(self.timeout_spinbox.value())
 
-            # If using SSL/TLS
-            if use_ssl:
+                # Try to resolve hostname first
                 try:
-                    context = ssl.create_default_context()
-                    context.check_hostname = False
-                    context.verify_mode = ssl.CERT_NONE
-                    sock = context.wrap_socket(sock, server_hostname=host)
+                    ip_address = socket.gethostbyname(host)
+                    print(f"Resolved {host} to {ip_address}")
+                except socket.gaierror:
+                    progress.hide()
+                    QMessageBox.critical(
+                        self,
+                        "Connection Test",
+                        f"Could not resolve hostname: {host}\nPlease verify the hostname/IP is correct."
+                    )
+                    return
+
+                # Try to connect
+                try:
+                    sock.connect((ip_address, port))
+                    print(f"Successfully connected to {host}:{port}")
+                    progress.hide()
+                    QMessageBox.information(
+                        self,
+                        "Connection Test",
+                        f"Successfully connected to {host}:{port}"
+                    )
+                except ConnectionRefusedError:
+                    progress.hide()
+                    QMessageBox.critical(
+                        self,
+                        "Connection Error",
+                        f"Connection refused. Please verify:\n"
+                        f"1. Port {port} is open on {host}\n"
+                        f"2. The service is running\n"
+                        f"3. Firewall allows the connection"
+                    )
                 except Exception as e:
-                    print(f"SSL Setup Error: {str(e)}")
-                    raise
+                    progress.hide()
+                    QMessageBox.critical(
+                        self,
+                        "Connection Error",
+                        f"Failed to connect:\n{str(e)}"
+                    )
 
-            # Try to connect
-            try:
-                sock.connect((host, port))
-                print(f"Successfully connected to {host}:{port}")
-            except ConnectionRefusedError:
-                raise Exception(
-                    f"Connection refused. Please verify:\n"
-                    f"1. Port {port} is open on {host}\n"
-                    f"2. The service is running\n"
-                    f"3. Firewall allows the connection"
-                )
-
-            sock.close()
-            
-            progress.hide()
-            QMessageBox.information(
-                self,
-                "Connection Test",
-                f"Successfully connected to {host}:{port}"
-            )
+            finally:
+                try:
+                    sock.close()
+                except:
+                    pass
 
         except Exception as e:
-            progress.hide()
+            if 'progress' in locals():
+                progress.hide()
             QMessageBox.critical(
                 self,
-                "Connection Test",
-                f"Connection failed:\n{str(e)}"
+                "Error",
+                f"An unexpected error occurred:\n{str(e)}"
             )
-        finally:
-            try:
-                sock.close()
-            except:
-                pass
 
     def test_credentials(self):
         """Test the selected credentials"""
@@ -746,7 +816,11 @@ class CommonSettingsDialog(QDialog):
         if system_id and system_id in self.config['license_systems']:
             system = self.config['license_systems'][system_id]
             
-            if system['system_type'] == 'database':
+            # Set default system_type if not present
+            if 'system_type' not in system:
+                system['system_type'] = 'network'  # Default to network type
+            
+            if system.get('system_type') == 'database':
                 # Update database config
                 if 'database_config' not in system:
                     system['database_config'] = {}
@@ -886,3 +960,21 @@ class CommonSettingsDialog(QDialog):
             )
         except Exception as e:
             raise Exception(f"Failed to connect: {str(e)}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -327,43 +327,33 @@ class MainWindow(QMainWindow):
             
             # Initialize license systems if not present
             if 'license_systems' not in self.config:
-                print("Initializing license systems in config")
-                self.config['license_systems'] = {
-                    system_id: {
+                self.config['license_systems'] = {}
+                for system_id, system in DEFAULT_SYSTEMS.items():
+                    self.config['license_systems'][system_id] = {
                         "name": system.name,
                         "enabled": system.enabled,
-                        "system_type": system.system_type,  # Add this
-                        "install_path": str(system.install_path) if system.install_path else None,
-                        "default_port": system.default_port,
+                        "system_type": system.system_type,
                         "description": system.description,
-                        "database_config": {  # Add this block
+                        "install_path": str(system.install_path) if system.install_path else None,
+                        "default_port": system.default_port
+                    }
+                    if hasattr(system, 'database_config') and system.database_config:
+                        self.config['license_systems'][system_id]["database_config"] = {
                             "type": system.database_config.type,
                             "host": system.database_config.host,
                             "port": system.database_config.port,
-                            "database": system.database_config.database,
-                            "username": system.database_config.username,
-                            "connection_string": system.database_config.connection_string
-                        } if system.database_config else None
-                    }
-                    for system_id, system in DEFAULT_SYSTEMS.items()
-                }
+                            "database": system.database_config.database
+                        }
             
             dialog = LicenseSystemsDialog(self.config, self)
-            result = dialog.exec_()
-            print(f"Dialog result: {result}")
-            
-            if result == QDialog.Accepted:
+            if dialog.exec_() == QDialog.Accepted:
                 # Save the updated configuration
-                system_id = dialog.system_combo.currentData()
-                if system_id:
-                    self.config['license_systems'][system_id]['enabled'] = dialog.enabled_checkbox.isChecked()
-                    print(f"Updated system {system_id} enabled status to {dialog.enabled_checkbox.isChecked()}")
-                    
+                self.save_config()
+                
         except Exception as e:
-            print(f"Error in show_license_systems: {str(e)}")
-            QMessageBox.warning(
+            QMessageBox.critical(
                 self,
-                "Warning",
+                "Error",
                 f"Could not open license systems configuration: {str(e)}"
             )
 
@@ -443,4 +433,5 @@ class MainWindow(QMainWindow):
         """Show the user guide dialog"""
         guide = UserGuideDialog(self)
         guide.exec_()
+
 

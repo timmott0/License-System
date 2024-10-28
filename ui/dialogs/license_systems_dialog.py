@@ -63,11 +63,6 @@ class LicenseSystemsDialog(QDialog):
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
         
-        # Add Test Connection button
-        self.test_button = QPushButton("Test Connection")
-        self.test_button.clicked.connect(self.test_connection)
-        layout.addWidget(self.test_button)
-        
         # Connect signals
         self.system_combo.currentIndexChanged.connect(self.update_system_info)
         self.update_system_info()
@@ -75,31 +70,48 @@ class LicenseSystemsDialog(QDialog):
     def accept(self):
         """Save settings when OK is clicked"""
         system_id = self.system_combo.currentData()
-        if system_id:
-            system_data = self.config['license_systems'][system_id]
-            system_data['enabled'] = self.enabled_checkbox.isChecked()
+        if not system_id:
+            QMessageBox.warning(
+                self,
+                "Validation Error",
+                "Please select a license system."
+            )
+            return
+
+        # Update system configuration
+        system_data = self.config['license_systems'][system_id]
+        system_data['enabled'] = self.enabled_checkbox.isChecked()
+        
+        # Handle credentials
+        if self.save_credentials_cb.isChecked():
+            if not self.username_edit.text().strip():
+                QMessageBox.warning(
+                    self,
+                    "Validation Error",
+                    "Please enter a username."
+                )
+                return
             
-            if self.save_credentials_cb.isChecked():
-                # Save credentials securely using keyring
-                import keyring
-                keyring.set_password(
-                    "license_manager",
-                    f"{system_id}_username",
-                    self.username_edit.text()
-                )
-                keyring.set_password(
-                    "license_manager",
-                    f"{system_id}_password",
-                    self.password_edit.text()
-                )
-            else:
-                # Remove any saved credentials
-                import keyring
-                try:
-                    keyring.delete_password("license_manager", f"{system_id}_username")
-                    keyring.delete_password("license_manager", f"{system_id}_password")
-                except keyring.errors.PasswordDeleteError:
-                    pass  # No saved credentials to delete
+            # Save credentials securely using keyring
+            import keyring
+            keyring.set_password(
+                "license_manager",
+                f"{system_id}_username",
+                self.username_edit.text()
+            )
+            keyring.set_password(
+                "license_manager",
+                f"{system_id}_password",
+                self.password_edit.text()
+            )
+        else:
+            # Remove any saved credentials
+            import keyring
+            try:
+                keyring.delete_password("license_manager", f"{system_id}_username")
+                keyring.delete_password("license_manager", f"{system_id}_password")
+            except keyring.errors.PasswordDeleteError:
+                pass  # No saved credentials to delete
         
         super().accept()
 
@@ -125,56 +137,3 @@ class LicenseSystemsDialog(QDialog):
                 self.username_edit.clear()
                 self.password_edit.clear()
                 self.save_credentials_cb.setChecked(False)
-
-    def test_connection(self):
-        """Test connection to the selected license system"""
-        system_id = self.system_combo.currentData()
-        if not system_id:
-            QMessageBox.warning(self, "Error", "Please select a license system")
-            return
-            
-        system_data = self.config['license_systems'].get(system_id)
-        if not system_data:
-            QMessageBox.warning(self, "Error", "Invalid system configuration")
-            return
-            
-        try:
-            # Get connection details
-            host = system_data.get('host', 'localhost')
-            port = system_data.get('port', 27000)
-            system_type = system_data.get('system_type')
-            
-            if not system_type:
-                raise ValueError("System type not configured")
-                
-            # Create appropriate connection handler based on system type
-            if system_type == 'flexlm':
-                from license_handlers.flexlm import FlexLMHandler
-                handler = FlexLMHandler(host, port)
-            elif system_type == 'hasp':
-                from license_handlers.hasp import HASPHandler
-                handler = HASPHandler(host, port)
-            else:
-                raise ValueError(f"Unsupported system type: {system_type}")
-                
-            # Test connection
-            handler.test_connection(
-                username=self.username_edit.text(),
-                password=self.password_edit.text()
-            )
-            
-            QMessageBox.information(
-                self,
-                "Success",
-                f"Successfully connected to {system_data['name']}"
-            )
-            
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Connection Failed",
-                f"Failed to connect: {str(e)}\n\nPlease verify:\n"
-                "1. System configuration is correct\n"
-                "2. Server is running and accessible\n"
-                "3. Credentials are valid"
-            )
