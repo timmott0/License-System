@@ -220,6 +220,11 @@ class MainWindow(QMainWindow):
         settings_action.triggered.connect(self.show_settings)
         tools_menu.addAction(settings_action)
         
+        # Add License Systems configuration to Tools menu
+        license_systems_action = QAction('License &Systems...', self)
+        license_systems_action.triggered.connect(self.show_license_systems)
+        tools_menu.addAction(license_systems_action)
+        
         # Add Key Management to Tools menu
         key_management_action = QAction('&Key Management...', self)
         key_management_action.triggered.connect(self.show_key_management)
@@ -314,6 +319,43 @@ class MainWindow(QMainWindow):
             f"License Management System\nVersion: {self.config.get('application', {}).get('version', '1.0.0')}\n\
             {self.config.get('application', {}).get('description', 'A secure system for creating and managing software licenses. Developed by Timothy Mott.')}"
         )
+
+    def show_license_systems(self):
+        """Show the license systems configuration dialog"""
+        try:
+            from config.license_systems import DEFAULT_SYSTEMS
+            
+            # Initialize license systems if not present
+            if 'license_systems' not in self.config:
+                self.config['license_systems'] = {}
+                for system_id, system in DEFAULT_SYSTEMS.items():
+                    self.config['license_systems'][system_id] = {
+                        "name": system.name,
+                        "enabled": system.enabled,
+                        "system_type": system.system_type,
+                        "description": system.description,
+                        "install_path": str(system.install_path) if system.install_path else None,
+                        "default_port": system.default_port
+                    }
+                    if hasattr(system, 'database_config') and system.database_config:
+                        self.config['license_systems'][system_id]["database_config"] = {
+                            "type": system.database_config.type,
+                            "host": system.database_config.host,
+                            "port": system.database_config.port,
+                            "database": system.database_config.database
+                        }
+            
+            dialog = LicenseSystemsDialog(self.config, self)
+            if dialog.exec_() == QDialog.Accepted:
+                # Save the updated configuration
+                self.save_config()
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Could not open license systems configuration: {str(e)}"
+            )
 
     def show_product_manager(self):
         """Show the product manager dialog"""

@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QDate
 from .dialogs.platform_select import PlatformSelectDialog
 from .dialogs.product_dialog import ProductDialog
 from core.product import Product
-from core.license_generator import LicenseGeneratorFactory
+from core.license_generator import LicenseGeneratorFactory, LicenseType
 from core.key_manager import KeyManager
 from encryption.license_signing import LicenseSigner
 from pathlib import Path
@@ -31,72 +31,140 @@ class LicenseType(Enum):
     FLOATING = "Floating License"
     CONCURRENT = "Concurrent License"
     NODELOCK = "Node-Locked License"
-    SQL = "SQL Database License"  # Add this line
+    SQL = "SQL Database License"
+    # Add new types here, for example:
+    # ENTERPRISE = "Enterprise License"
 
 class BaseLicenseGenerator:
     """Base class for all license generators"""
     
     def __init__(self, signer):
-        self.signer = signer
+        self.signer = signer  # LicenseSigner instance
     
     def generate_license(self, customer_info: Dict, license_info: Dict, 
                         products: List, host_info: Dict) -> str:
         raise NotImplementedError()
     
-    def save_license(self, license_data: str, output_path: Path):
-        raise NotImplementedError()
+    def save_license(self, license_data: str, output_path: Path) -> None:
+        """Save license data to file"""
+        try:
+            # Default implementation for text-based licenses
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(license_data)
+        except Exception as e:
+            raise IOError(f"Failed to save license: {str(e)}")
 
 class FlexLMGenerator(BaseLicenseGenerator):
     def generate_license(self, customer_info: Dict, license_info: Dict, 
                         products: List, host_info: Dict) -> str:
-        flexlm_data = [
-            f"SERVER this_host {host_info.get('hostid', 'ANY')} {license_info.get('port', '27000')}",
-            f"VENDOR {license_info.get('vendor_daemon', 'vendor_daemon')}",
-            ""
-        ]
-        
-        # Add license type as a comment
-        if 'license_type' in license_info:
-            flexlm_data.insert(0, f"# License Type: {license_info['license_type']}")
-        
-        # Convert expiration_date to datetime if it's a date object
-        expiration_date = license_info['expiration_date']
-        if isinstance(expiration_date, datetime.date):
-            expiration_date = datetime.datetime.combine(expiration_date, datetime.datetime.min.time())
-        
-        for product in products:
-            feature_line = (
-                f"FEATURE {product.name} {license_info.get('vendor_daemon', 'vendor_daemon')} "
-                f"{product.version} {expiration_date.strftime('%d-%b-%Y')} "
-                f"{product.quantity} HOSTID={host_info.get('hostid', 'ANY')} "
-                f"VENDOR_STRING=\"{customer_info['name']}\" "
-                f"ISSUER={customer_info['id']} "
-                f"SIGN={self.signer.generate_flexlm_signature()}"
-            )
-            flexlm_data.append(feature_line)
+        # Validate required fields
+        if not all([customer_info, license_info, products]):
+            raise ValueError("Missing required license information")
             
-        return "\n".join(flexlm_data)
+        # Prepare FlexLM format data
+        license_data = {
+            'type': 'flexlm',
+            'server': {
+                'host': host_info.get('hostid', 'ANY'),
+                'port': license_info.get('port', '27000'),
+                'vendor_daemon': license_info.get('vendor_daemon', 'vendor_daemon')
+            },
+            'customer': customer_info,
+            'license': license_info,
+            'products': [
+                {
+                    'name': product.name,
+                    'version': product.version,
+                    'quantity': product.quantity,
+                    'expiration': license_info['expiration_date'].isoformat()
+                }
+                for product in products
+            ]
+        }
+        
+        # Sign and return the license data
+        return self.signer.sign_license_data(license_data)
+
+    def save_license(self, license_data: str, output_path: Path) -> None:
+        # FlexLM uses specific text format
+        super().save_license(license_data, output_path)
 
 class HASPGenerator(BaseLicenseGenerator):
     def generate_license(self, customer_info: Dict, license_info: Dict, 
                         products: List, host_info: Dict) -> str:
-        # Implement HASP-specific license generation
-        hasp_data = {
-            "header": {
-                "type": "hasp",
-                "version": "1.0"
-            },
-            "customer": customer_info,
-            "products": [p.to_dict() for p in products],
-            # Add HASP-specific fields
+        # Prepare HASP format data
+        license_data = {
+            'type': 'hasp',
+            'version': '1.0',
+            'customer': customer_info,
+            'products': [
+                {
+                    'name': p.name,
+                    'version': p.version,
+                    'quantity': p.quantity
+                }
+                for p in products
+            ],
+            'license': license_info,
+            'host': host_info
         }
-        return self.signer.sign_hasp_data(hasp_data)
+        
+        # Sign the license data using the provided signer
+        return self.signer.sign_license_data(license_data)
+
+class MySQLGenerator(BaseLicenseGenerator):
+    def generate_license(self, customer_info: Dict, license_info: Dict, 
+                        products: List, host_info: Dict) -> str:
+        # Prepare MySQL format data
+        license_data = {
+            'type': 'mysql',
+            'database': {
+                'host': license_info.get('sql_host', 'localhost'),
+                'port': license_info.get('sql_port', 3306),
+                'name': license_info.get('sql_database', 'licenses')
+            },
+            'customer': customer_info,
+            'license': license_info,
+            'products': [
+                {
+                    'name': product.name,
+                    'version': product.version,
+                    'quantity': product.quantity,
+                    'expiration': license_info['expiration_date'].isoformat()
+                }
+                for product in products
+            ]
+        }
+        
+        # Sign the license data using the provided signer
+        return self.signer.sign_license_data(license_data)
 
 # Add other generator implementations...
 
 class LicenseFrame(QFrame):
     def __init__(self, parent=None, config=None):
         super().__init__(parent)
+        self.validate_config(config)
+        self.initialize_components(config)
+        self.setup_ui()
+
+    def validate_config(self, config: Dict):
+        """Validate configuration structure"""
+        if not config:
+            raise ValueError("Configuration is required")
+            
+        # Validate paths
+        key_paths = config.get('paths', {}).get('keys', {})
+        required_paths = ['private_key_path', 'public_key_path']
+        missing = [p for p in required_paths if not key_paths.get(p)]
+        if missing:
+            raise ValueError(f"Missing required key paths: {', '.join(missing)}")
+            
+        # Validate license systems
+        if not isinstance(config.get('license_systems'), dict):
+            raise ValueError("Invalid license systems configuration")
+
+    def initialize_components(self, config: Dict):
         self.config = config
         self.floating_license_config = None  # Store floating license settings
         self.credentials_manager = CredentialsManager()
@@ -113,8 +181,6 @@ class LicenseFrame(QFrame):
         # Create SQL options widget
         self.sql_options = self.create_sql_options()
         self.sql_options.setVisible(False)  # Hide by default
-        
-        self.setup_ui()
         
     def setup_ui(self):
         """Initialize the license frame UI"""
@@ -284,11 +350,25 @@ class LicenseFrame(QFrame):
         group.setLayout(layout)
         return group
         
-    def on_license_type_changed(self, index):
-        """Handle license type changes"""
-        # Update UI based on license type
-        pass
+    def on_license_type_changed(self, index_or_text):
+        """Handle license type selection changes"""
+        license_type = self.license_type_combo.currentData()
         
+        # Hide all system-specific options by default
+        if hasattr(self, 'sql_options'):
+            self.sql_options.setVisible(False)
+        
+        if license_type == LicenseType.FLOATING:
+            dialog = FloatingLicenseDialog(self)
+            if dialog.exec_():
+                self.floating_license_config = dialog.get_values()
+                print(f"Floating license configured with {self.floating_license_config}")
+        
+        # Show SQL options if SQL license type is selected
+        elif license_type == LicenseType.SQL:
+            if hasattr(self, 'sql_options'):
+                self.sql_options.setVisible(True)
+
     def show_platform_dialog(self):
         """Show platform selection dialog"""
         # Pass the currently selected platforms to the dialog
@@ -305,30 +385,44 @@ class LicenseFrame(QFrame):
         """Validate all form inputs"""
         errors = []
         
-        # Validate customer information
-        customer_info = {
-            'name': self.customer_name.text(),
-            'id': self.customer_id.text(),
-            'email': self.contact_email.text()
-        }
-        errors.extend(LicenseValidator.validate_customer_info(customer_info))
-        
-        # Validate dates
-        valid_dates, date_error = LicenseValidator.validate_dates(
-            self.expiration_date.date().toPyDate(),
-            self.maintenance_date.date().toPyDate()
-        )
-        if not valid_dates:
-            errors.append(date_error)
-        
-        # Validate products
-        if self.product_container.layout().count() == 0:
-            errors.append("At least one product is required")
-        
-        # Validate platform selection
-        if not hasattr(self, 'selected_platforms') or not self.selected_platforms:
-            errors.append("At least one platform must be selected")
-        
+        try:
+            # Validate customer information
+            customer_info = {
+                'name': self.customer_name.text().strip(),
+                'id': self.customer_id.text().strip(),
+                'email': self.contact_email.text().strip()
+            }
+            
+            if not all(customer_info.values()):
+                errors.append("All customer information fields are required")
+                
+            # Validate license type
+            if not self.license_type_combo.currentData():
+                errors.append("License type must be selected")
+            
+            # Validate platforms
+            if not self.selected_platforms:
+                errors.append("At least one platform must be selected")
+            
+            # Validate products
+            if not self.get_products():
+                errors.append("At least one product must be selected")
+            
+            # Validate dates
+            if self.expiration_date.date() <= QDate.currentDate():
+                errors.append("Expiration date must be in the future")
+            
+            # Validate system-specific options
+            license_system = self.license_system_combo.currentData()
+            if license_system == 'mysql':
+                if not self.sql_host.text().strip():
+                    errors.append("Database host is required")
+                if not self.sql_database.text().strip():
+                    errors.append("Database name is required")
+            
+        except AttributeError as e:
+            errors.append(f"Form validation failed: {str(e)}")
+            
         return len(errors) == 0, errors
 
     def generate_license(self):
@@ -344,31 +438,19 @@ class LicenseFrame(QFrame):
                 )
                 return
 
-            # Get selected license type from the license type combo
-            license_type = self.license_type_combo.currentData()  # This gets the LicenseType enum value
+            # Get selected license system from combo
+            license_system = self.license_system_combo.currentData()
             
-            # Get selected license system from the license system combo
-            license_system = self.license_system_combo.currentData()  # This gets the system ID (flexlm, hasp, etc.)
+            # Create generator using factory
+            generator = LicenseGeneratorFactory.create_generator(
+                license_system,
+                self.signer
+            )
             
-            # Get system-specific options
-            system_options = self.get_system_options(license_system)
-            
-            # Create appropriate generator based on the license system
-            if license_system == 'flexlm':
-                generator = FlexLMGenerator(self.signer)
-            elif license_system == 'hasp':
-                generator = HASPGenerator(self.signer)
-            else:
-                raise ValueError(f"Unsupported license system: {license_system}")
-            
-            # Generate license with system-specific options
+            # Generate license
             license_data = generator.generate_license(
                 self.get_customer_info(),
-                {
-                    **self.get_license_info(),
-                    **system_options,
-                    'license_type': license_type.value  # Pass the license type value
-                },
+                self.get_license_info(),
                 self.get_products(),
                 self.get_host_info()
             )
@@ -586,8 +668,6 @@ class LicenseFrame(QFrame):
             # Generate filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"license_{timestamp}{extension}"
-            
-            # Full path for the license file
             license_path = path / filename
             
             # Save the license data
@@ -833,30 +913,43 @@ class LicenseFrame(QFrame):
             )
 
     def generate_license_data(self):
-        """Generate the license data based on the selected license system"""
-        license_system = self.license_system_combo.currentData()
-        
-        if license_system == 'flexlm':
-            # Generate FlexLM format
-            generator = FlexLMGenerator(self.signer)
+        """Generate license data with proper validation and error handling"""
+        try:
+            # CRITICAL: Must validate before generating
+            valid, errors = self.validate_form()
+            if not valid:
+                raise ValueError(f"Validation failed: {', '.join(errors)}")
+                
+            # CRITICAL: Must check license system
+            license_system = self.license_system_combo.currentData()
+            if not license_system:
+                raise ValueError("No license system selected")
+                
+            # CRITICAL: Must validate products
+            products = self.get_products()
+            if not products:
+                raise ValueError("No products selected")
+            
+            # Create appropriate generator based on license system
+            if license_system == 'flexlm':
+                generator = FlexLMGenerator(self.signer)
+            elif license_system == 'hasp':
+                generator = HASPGenerator(self.signer)
+            elif license_system == 'mysql':
+                generator = MySQLGenerator(self.signer)
+            else:
+                raise ValueError(f"Unsupported license system: {license_system}")
+                
             return generator.generate_license(
                 self.get_customer_info(),
                 self.get_license_info(),
-                self.get_products(),
+                products,
                 self.get_host_info()
             )
-        elif license_system == 'hasp':
-            # Generate HASP format
-            generator = HASPGenerator(self.signer)
-            return generator.generate_license(
-                self.get_customer_info(),
-                self.get_license_info(),
-                self.get_products(),
-                self.get_host_info()
-            )
-        # Add other license system generators as needed
-        
-        raise ValueError(f"Unsupported license system: {license_system}")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"License generation failed: {str(e)}")
+            raise
 
     def get_license_info(self) -> Dict:
         """Get license information from the form"""
@@ -876,13 +969,20 @@ class LicenseFrame(QFrame):
             'port': '27000'   # Default port
         }
 
-    def get_customer_info(self) -> Dict:
+    def get_customer_info(self):
         """Get customer information from the form"""
-        return {
+        # CRITICAL: Must validate all fields
+        customer_info = {
             'name': self.customer_name.text().strip(),
             'id': self.customer_id.text().strip(),
             'email': self.contact_email.text().strip()
         }
+        
+        # CRITICAL: Must check for empty values
+        if not all(customer_info.values()):
+            raise ValueError("All fields required")
+        
+        return customer_info
 
     def refresh_product_list(self):
         """Refresh the product checkboxes after changes"""
@@ -950,10 +1050,6 @@ class LicenseFrame(QFrame):
             for system_id, system in self.config['license_systems'].items():
                 if system.get('enabled', True):
                     self.license_system_combo.addItem(system['name'], system_id)
-
-
-
-
 
 
 

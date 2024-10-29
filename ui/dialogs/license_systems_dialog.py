@@ -147,9 +147,3 @@ class LicenseSystemsDialog(QDialog):
                     self.username_edit.setText(username)
                     self.password_edit.setText(password)
                     self.save_credentials_cb.setChecked(True)
-
-    def on_ssl_toggled(self, checked):
-        """Handle SSL checkbox state changes"""
-        self.verify_ssl.setEnabled(checked)
-        if not checked:
-            self.verify_ssl.setChecked(False)

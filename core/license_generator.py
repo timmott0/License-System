@@ -1,6 +1,6 @@
 # Standard library imports
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from pathlib import Path
 import json
 import logging
@@ -29,38 +29,75 @@ class LicenseGeneratorFactory:
     """Factory to create appropriate license generator based on type"""
     
     @staticmethod
-    def create_generator(license_type: LicenseType, signer) -> 'BaseLicenseGenerator':
-        if license_type == LicenseType.FLEXLM:
-            return FlexLMGenerator(signer)
-        elif license_type == LicenseType.HASP:
-            return HASPGenerator(signer)
-        elif license_type == LicenseType.LICENSESERVER:
-            return CustomServerGenerator(signer)
-        elif license_type == LicenseType.NODELOCK:
-            return NodeLockedGenerator(signer)
-        elif license_type == LicenseType.FLOATING:
-            return FloatingLicenseGenerator(signer)
-        elif license_type == LicenseType.SQL:  # Add this case
-            return SQLLicenseGenerator(signer)
+    def create_generator(license_type: Union[str, LicenseType], signer: LicenseSigner) -> 'BaseLicenseGenerator':
+        """
+        Create appropriate generator based on license system type
+        Supports both string-based types and LicenseType enum
+        """
+        # Map both enum types and string IDs to generators
+        generator_map = {
+            # Enum-based mappings
+            LicenseType.SINGLE_USER: NodeLockedGenerator,
+            LicenseType.VOLUME: NodeLockedGenerator,
+            LicenseType.SUBSCRIPTION: CustomServerGenerator,
+            LicenseType.TRIAL: CustomServerGenerator,
+            LicenseType.FREEMIUM: CustomServerGenerator,
+            LicenseType.FLOATING: FloatingLicenseGenerator,
+            LicenseType.CONCURRENT: FloatingLicenseGenerator,
+            LicenseType.NODELOCK: NodeLockedGenerator,
+            LicenseType.SQL: SQLLicenseGenerator,
+            # String-based mappings for backwards compatibility
+            'flexlm': FlexLMGenerator,
+            'hasp': HASPGenerator,
+            'mysql': SQLLicenseGenerator,
+            'custom': CustomServerGenerator,
+            'nodelock': NodeLockedGenerator,
+            'floating': FloatingLicenseGenerator,
+            'licenseserver': CustomServerGenerator
+        }
+        
+        # If input is string, convert to lowercase for matching
+        if isinstance(license_type, str):
+            license_type = license_type.lower()
+            
+        generator_class = generator_map.get(license_type)
+        if generator_class:
+            return generator_class(signer)
         else:
-            raise ValueError(f"Unsupported license type: {license_type}")
+            raise ValueError(f"Unsupported license system: {license_type}")
 
 class BaseLicenseGenerator:
     """Base class for all license generators"""
     
-    def __init__(self, signer):
+    def __init__(self, signer: LicenseSigner):
         self.signer = signer
     
     def generate_license(self, customer_info: Dict, license_info: Dict, 
-                        products: List, host_info: Dict) -> str:
-        raise NotImplementedError()
+                        products: List[Product], host_info: Dict) -> str:
+        """Validate common fields before specific generation"""
+        if not all([customer_info, license_info, products]):
+            raise ValueError("Missing required license information")
+        
+        # Validate customer info
+        required_customer_fields = ['name', 'id', 'email']
+        if not all(field in customer_info for field in required_customer_fields):
+            raise ValueError("Missing required customer information")
+            
+        # Validate license info
+        required_license_fields = ['license_type', 'expiration_date']
+        if not all(field in license_info for field in required_license_fields):
+            raise ValueError("Missing required license information")
+        
+        return self._generate_specific_license(customer_info, license_info, products, host_info)
     
-    def save_license(self, license_data: str, output_path: Path):
+    def _generate_specific_license(self, customer_info: Dict, license_info: Dict, 
+                                 products: List[Product], host_info: Dict) -> str:
+        """To be implemented by specific generators"""
         raise NotImplementedError()
 
 class FlexLMGenerator(BaseLicenseGenerator):
-    def generate_license(self, customer_info: Dict, license_info: Dict, 
-                        products: List, host_info: Dict) -> str:
+    def _generate_specific_license(self, customer_info: Dict, license_info: Dict, 
+                                 products: List[Product], host_info: Dict) -> str:
         flexlm_data = [
             f"SERVER this_host {host_info.get('hostid', 'ANY')} {license_info.get('port', '27000')}",
             "VENDOR vendor_daemon",
@@ -81,8 +118,8 @@ class FlexLMGenerator(BaseLicenseGenerator):
         return "\n".join(flexlm_data)
 
 class HASPGenerator(BaseLicenseGenerator):
-    def generate_license(self, customer_info: Dict, license_info: Dict, 
-                        products: List, host_info: Dict) -> str:
+    def _generate_specific_license(self, customer_info: Dict, license_info: Dict, 
+                                 products: List[Product], host_info: Dict) -> str:
         # Implement HASP-specific license generation
         hasp_data = {
             "header": {
@@ -96,8 +133,8 @@ class HASPGenerator(BaseLicenseGenerator):
         return self.signer.sign_hasp_data(hasp_data)
 
 class CustomServerGenerator(BaseLicenseGenerator):
-    def generate_license(self, customer_info: Dict, license_info: Dict, 
-                        products: List, host_info: Dict) -> str:
+    def _generate_specific_license(self, customer_info: Dict, license_info: Dict, 
+                                 products: List[Product], host_info: Dict) -> str:
         license_data = {
             "type": "custom_server",
             "customer": customer_info,
@@ -108,8 +145,8 @@ class CustomServerGenerator(BaseLicenseGenerator):
         return self.signer.sign_license_data(license_data)
 
 class NodeLockedGenerator(BaseLicenseGenerator):
-    def generate_license(self, customer_info: Dict, license_info: Dict, 
-                        products: List, host_info: Dict) -> str:
+    def _generate_specific_license(self, customer_info: Dict, license_info: Dict, 
+                                 products: List[Product], host_info: Dict) -> str:
         license_data = {
             "type": "node_locked",
             "customer": customer_info,
@@ -121,8 +158,8 @@ class NodeLockedGenerator(BaseLicenseGenerator):
         return self.signer.sign_license_data(license_data)
 
 class FloatingLicenseGenerator(BaseLicenseGenerator):
-    def generate_license(self, customer_info: Dict, license_info: Dict, 
-                        products: List, host_info: Dict) -> str:
+    def _generate_specific_license(self, customer_info: Dict, license_info: Dict, 
+                                 products: List[Product], host_info: Dict) -> str:
         license_data = {
             "type": "floating",
             "customer": customer_info,
@@ -137,8 +174,8 @@ class FloatingLicenseGenerator(BaseLicenseGenerator):
 
 # Add this class after your other generator classes
 class SQLLicenseGenerator(BaseLicenseGenerator):
-    def generate_license(self, customer_info: Dict, license_info: Dict, 
-                        products: List, host_info: Dict) -> str:
+    def _generate_specific_license(self, customer_info: Dict, license_info: Dict, 
+                                 products: List[Product], host_info: Dict) -> str:
         """Generate SQL-based license"""
         license_data = {
             "type": "sql",
