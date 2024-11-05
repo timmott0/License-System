@@ -47,8 +47,10 @@
         "customer_base": "customers"
     },
     "server": {
-        "host": "192.168.0.11",
-        "port": 5001
+        "host": "192.168.0.1",
+        "port": 5001,
+        "username": "timmy",
+        "password": "JapanistheBest21!!"
     },
     "backup_server": {
         "host": "",
@@ -56,9 +58,9 @@
     },
     "connection": {
         "timeout": 30,
-        "max_retries": 0,
+        "max_retries": 3,
         "use_ssl": true,
-        "verify_ssl": false,
-        "cert_path": ""
+        "verify_ssl": true,
+        "cert_path": "C:/Users/timot/Downloads/archive/cert.pem"
     }
 }
