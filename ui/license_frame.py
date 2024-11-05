@@ -668,22 +668,35 @@ class LicenseFrame(QFrame):
             # Generate filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"license_{timestamp}{extension}"
-            license_path = path / filename
             
-            # Save the license data
-            if license_system == 'flexlm':
-                # Save as text file
-                with open(license_path, 'w') as f:
-                    f.write(license_data)
-            else:
-                # Save as binary file for other formats
-                with open(license_path, 'wb') as f:
-                    f.write(license_data)
+            # Save to both local and server paths if server is configured
+            paths_to_save = [path]  # Start with local path
+            
+            # Add server path if configured
+            if self.config.get('server', {}).get('path'):
+                server_base_path = Path(self.config['server']['path'])
+                server_path = server_base_path / customer_name / customer_id
+                server_path.mkdir(parents=True, exist_ok=True)
+                paths_to_save.append(server_path)
+            
+            # Save to all configured paths
+            for save_path in paths_to_save:
+                license_path = save_path / filename
+                
+                # Save based on license system type
+                if license_system == 'flexlm':
+                    # Save as text file
+                    with open(license_path, 'w') as f:
+                        f.write(license_data)
+                else:
+                    # Save as binary file for other formats
+                    with open(license_path, 'wb') as f:
+                        f.write(license_data)
             
             QMessageBox.information(
                 self,
                 "Success",
-                f"License saved successfully to:\n{license_path}"
+                f"License saved successfully to:\n" + "\n".join(str(p / filename) for p in paths_to_save)
             )
             
         except Exception as e:
