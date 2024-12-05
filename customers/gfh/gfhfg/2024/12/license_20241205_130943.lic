@@ -1,0 +1,34 @@
+{
+  "data": {
+    "type": "custom_server",
+    "customer": {
+      "name": "gfh",
+      "id": "gfhfg",
+      "email": "gfdgh@yahoo.com"
+    },
+    "license": {
+      "expiration_date": "2025-12-05",
+      "maintenance_date": "2025-03-05",
+      "license_type": "Single-User License",
+      "platforms": [
+        "Windows"
+      ]
+    },
+    "products": [
+      {
+        "name": "fds",
+        "version": "dfds",
+        "quantity": 1,
+        "features": [],
+        "expiration_date": null,
+        "maintenance_date": null
+      }
+    ],
+    "host": {
+      "hostid": "ANY",
+      "port": "27000"
+    },
+    "timestamp": "2024-12-05T18:09:43.345951"
+  },
+  "signature": "XXe9rlL+4bImYBXuUk+sOKZWUDYfGXZMha6FP3omxM5gZB7/WAKW9RFOONA1zX8vbBQmsLEi/SxtETTlCdwKfOwhmPokVDXrIs1qd6vY4c65/aUyH01//drTY7MIzs95r3CDjtLYCcdzF2XfN5+YpMlTfBsJN3pyzmrv83Jq2ieGRc0s5hCa88JPa816NVb1cGD2u7vK6SUigP24P/8TXg1hVeg53bb8/tqjPPMq8cQ0Of09fdVR5oHbApQnwgUNVut3FeCTZPz8Cp2akk36DgNaxmxsAhkBcLHLKTd9cv1D8uzzbeM6aTa7jihqULDqWD5Rakfo9ZF8W/50pK0OeA=="
+}

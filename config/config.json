@@ -41,7 +41,9 @@
         "config": "config",
         "keys": {
             "private_key_path": "config/keys/private_key.pem",
-            "public_key_path": "config/keys/public_key.pem"
+            "public_key_path": "config/keys/public_key.pem",
+            "private_key": "config\\keys\\private_key.pem",
+            "public_key": "config\\keys\\public_key.pem"
         },
         "default_save": "C:/Users/timot/MLK-python/src/severpathtest",
         "customer_base": "customers"

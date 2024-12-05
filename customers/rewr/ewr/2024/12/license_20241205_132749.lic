@@ -1,0 +1,34 @@
+{
+  "data": {
+    "type": "custom_server",
+    "customer": {
+      "name": "rewr",
+      "id": "ewr",
+      "email": "erwe@yahoo.com"
+    },
+    "license": {
+      "expiration_date": "2025-12-05",
+      "maintenance_date": "2025-03-05",
+      "license_type": "Floating License",
+      "platforms": [
+        "Windows"
+      ]
+    },
+    "products": [
+      {
+        "name": "xzfc",
+        "version": "223",
+        "quantity": 1,
+        "features": [],
+        "expiration_date": null,
+        "maintenance_date": null
+      }
+    ],
+    "host": {
+      "hostid": "ANY",
+      "port": "27000"
+    },
+    "timestamp": "2024-12-05T18:27:49.427231"
+  },
+  "signature": "iYs/L2mZ32paTKDkpBzeXG0Od7c9ZIthZfntORlMfARjAEIUqKVGAsLtGkW1Xc8NQAiIZP7j8GYxhWUTW2vAzOv5CbbN5eyYEJl954mlhqv48WhvyCv6Nx3Zo9Mg2KkzwuJngpSlPr5hjFR0/Wp56rVQSYVNRV69TedNqV4opvDtab8ryqKy8yy4Ecg7TFzu1Oo6El9BZnXsaX0P6zfeuAo87zBmGxrv5LLbwIzJvm8YNiTodgaBpU97GR2O7+OYisdaSi6fUBginAwmSuz9GIDa9ZD1MwpbTuPHi8tUypFKzYFUw0QKtVW9D0u+ooMNYh0isHl0Z86kd3dUn487ww=="
+}

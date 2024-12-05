@@ -11,6 +11,14 @@ class ProductFeature:
     quantity: int = 1    # Number of instances/licenses for this feature
     enabled: bool = True # Whether the feature is currently enabled
 
+    def enable(self):
+        """Enable the feature"""
+        self.enabled = True
+
+    def disable(self):
+        """Disable the feature"""
+        self.enabled = False
+
 @dataclass
 class Product:
     """
@@ -22,7 +30,20 @@ class Product:
     quantity: int = 1    # Number of product licenses
     expiration_date: Optional[datetime] = None     # When the product license expires
     maintenance_date: Optional[datetime] = None    # When maintenance support ends
-    
+    enabled: bool = False  # Whether the product is currently enabled
+
+    def enable(self):
+        """Enable the product and its features"""
+        self.enabled = True
+        for feature in self.features:
+            feature.enable()
+
+    def disable(self):
+        """Disable the product and its features"""
+        self.enabled = False
+        for feature in self.features:
+            feature.disable()
+
     def to_dict(self) -> Dict:
         """
         Convert product to dictionary format for serialization
@@ -34,7 +55,6 @@ class Product:
             "name": self.name,
             "version": self.version,
             "quantity": self.quantity,
-            # Convert list of features to list of dictionaries
             "features": [
                 {
                     "name": f.name,
@@ -44,7 +64,6 @@ class Product:
                 }
                 for f in self.features
             ],
-            # Convert datetime objects to ISO format strings if they exist
             "expiration_date": self.expiration_date.isoformat() if self.expiration_date else None,
             "maintenance_date": self.maintenance_date.isoformat() if self.maintenance_date else None
         }
@@ -60,7 +79,6 @@ class Product:
         Returns:
             New Product instance with data from dictionary
         """
-        # Convert feature dictionaries to ProductFeature objects
         features = [
             ProductFeature(**f) for f in data.get("features", [])
         ]
@@ -70,7 +88,6 @@ class Product:
             version=data["version"],
             features=features,
             quantity=data.get("quantity", 1),
-            # Convert ISO format strings back to datetime objects if they exist
             expiration_date=datetime.fromisoformat(data["expiration_date"]) if data.get("expiration_date") else None,
             maintenance_date=datetime.fromisoformat(data["maintenance_date"]) if data.get("maintenance_date") else None
         )

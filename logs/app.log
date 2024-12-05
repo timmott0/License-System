@@ -501,3 +501,65 @@
 2024-11-05 09:36:03,848 - __main__ - INFO - Configuration loaded successfully
 2024-11-05 09:36:59,556 - __main__ - INFO - License Management System starting...
 2024-11-05 09:36:59,557 - __main__ - INFO - Configuration loaded successfully
+2024-11-05 09:54:30,289 - __main__ - INFO - License Management System starting...
+2024-11-05 09:54:30,289 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 12:00:22,471 - __main__ - INFO - License Management System starting...
+2024-12-05 12:00:22,472 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 12:01:10,150 - encryption.license_signing - ERROR - Failed to sign license: Object of type date is not JSON serializable
+2024-12-05 12:04:50,043 - __main__ - INFO - License Management System starting...
+2024-12-05 12:04:50,044 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 12:05:24,328 - encryption.license_signing - ERROR - Failed to sign license: 'KeyManager' object has no attribute 'load_private_key'
+2024-12-05 12:07:37,369 - __main__ - INFO - License Management System starting...
+2024-12-05 12:07:37,369 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 12:08:15,294 - core.key_manager - ERROR - Failed to load private key: [Errno 2] No such file or directory: 'config\\keys\\private_key.pem'
+2024-12-05 12:08:15,296 - encryption.license_signing - ERROR - Failed to sign license: [Errno 2] No such file or directory: 'config\\keys\\private_key.pem'
+2024-12-05 12:21:20,690 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:21:51,323 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:22:52,706 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:26:21,491 - __main__ - INFO - License Management System starting...
+2024-12-05 12:26:21,506 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 12:26:52,141 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:27:30,651 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:28:16,739 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:32:55,971 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:33:53,015 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:36:19,935 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:42:35,438 - __main__ - INFO - License Management System starting...
+2024-12-05 12:42:35,439 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 12:44:51,016 - __main__ - INFO - License Management System starting...
+2024-12-05 12:44:51,016 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 12:44:51,561 - __main__ - ERROR - Failed to start application: name 'QStyle' is not defined
+2024-12-05 12:45:13,765 - __main__ - INFO - License Management System starting...
+2024-12-05 12:45:13,766 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 12:46:29,537 - __main__ - INFO - License Management System starting...
+2024-12-05 12:46:29,537 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 12:47:24,017 - core.key_manager - ERROR - Failed to load private key: ('Could not deserialize key data. The data may be in an incorrect format, the provided password may be incorrect, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters).', [<OpenSSLError(code=503841036, lib=60, reason=524556, reason_text=unsupported)>])
+2024-12-05 12:47:24,018 - encryption.license_signing - ERROR - Failed to sign license: ('Could not deserialize key data. The data may be in an incorrect format, the provided password may be incorrect, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters).', [<OpenSSLError(code=503841036, lib=60, reason=524556, reason_text=unsupported)>])
+2024-12-05 12:47:57,110 - core.key_manager - ERROR - Failed to load private key: ('Could not deserialize key data. The data may be in an incorrect format, the provided password may be incorrect, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters).', [<OpenSSLError(code=503841036, lib=60, reason=524556, reason_text=unsupported)>])
+2024-12-05 12:47:57,112 - encryption.license_signing - ERROR - Failed to sign license: ('Could not deserialize key data. The data may be in an incorrect format, the provided password may be incorrect, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters).', [<OpenSSLError(code=503841036, lib=60, reason=524556, reason_text=unsupported)>])
+2024-12-05 12:48:05,974 - core.key_manager - ERROR - Failed to load private key: ('Could not deserialize key data. The data may be in an incorrect format, the provided password may be incorrect, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters).', [<OpenSSLError(code=503841036, lib=60, reason=524556, reason_text=unsupported)>])
+2024-12-05 12:48:05,975 - encryption.license_signing - ERROR - Failed to sign license: ('Could not deserialize key data. The data may be in an incorrect format, the provided password may be incorrect, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters).', [<OpenSSLError(code=503841036, lib=60, reason=524556, reason_text=unsupported)>])
+2024-12-05 12:48:10,023 - core.key_manager - ERROR - Failed to load private key: ('Could not deserialize key data. The data may be in an incorrect format, the provided password may be incorrect, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters).', [<OpenSSLError(code=503841036, lib=60, reason=524556, reason_text=unsupported)>])
+2024-12-05 12:48:10,024 - encryption.license_signing - ERROR - Failed to sign license: ('Could not deserialize key data. The data may be in an incorrect format, the provided password may be incorrect, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters).', [<OpenSSLError(code=503841036, lib=60, reason=524556, reason_text=unsupported)>])
+2024-12-05 12:48:46,982 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 12:54:26,345 - __main__ - INFO - License Management System starting...
+2024-12-05 12:54:26,347 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 13:03:41,275 - __main__ - INFO - License Management System starting...
+2024-12-05 13:03:41,276 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 13:06:39,093 - __main__ - INFO - License Management System starting...
+2024-12-05 13:06:39,094 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 13:07:38,538 - __main__ - INFO - License Management System starting...
+2024-12-05 13:07:38,538 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 13:09:43,378 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem
+2024-12-05 13:15:06,269 - __main__ - INFO - License Management System starting...
+2024-12-05 13:15:06,270 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 13:18:43,745 - __main__ - INFO - License Management System starting...
+2024-12-05 13:18:43,746 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 13:18:44,009 - __main__ - ERROR - Failed to start application: 'LicenseFrame' object has no attribute 'save_path_input'
+2024-12-05 13:20:11,216 - __main__ - INFO - License Management System starting...
+2024-12-05 13:20:11,217 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 13:21:42,832 - __main__ - INFO - License Management System starting...
+2024-12-05 13:21:42,833 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 13:26:45,619 - __main__ - INFO - License Management System starting...
+2024-12-05 13:26:45,620 - __main__ - INFO - Configuration loaded successfully
+2024-12-05 13:27:49,461 - core.key_manager - INFO - Private key loaded from: config\keys\private_key.pem

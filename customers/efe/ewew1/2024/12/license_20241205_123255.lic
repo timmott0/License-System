@@ -1,0 +1,34 @@
+{
+  "data": {
+    "type": "custom_server",
+    "customer": {
+      "name": "efe",
+      "id": "ewew1",
+      "email": "we@yahoo.com"
+    },
+    "license": {
+      "expiration_date": "2025-12-05",
+      "maintenance_date": "2025-03-05",
+      "license_type": "Floating License",
+      "platforms": [
+        "Windows"
+      ]
+    },
+    "products": [
+      {
+        "name": "fdsf",
+        "version": "we",
+        "quantity": 1,
+        "features": [],
+        "expiration_date": null,
+        "maintenance_date": null
+      }
+    ],
+    "host": {
+      "hostid": "ANY",
+      "port": "27000"
+    },
+    "timestamp": "2024-12-05T17:32:55.946676"
+  },
+  "signature": "xaBbMVPqfcNyuLyqZR8wUlFioAgZSHRs3cXPgZwEUL70hP1xdcxW7HBX9xbVRnkZ9goHk5xbwraD8qNey1Mfl8gOR4fsGMymEfNh6BLA7l0AXGo4/s3B0kQI1Y1Xtq1vAPHyNSVv0BuxakIxR9cxjcxEqZsctVXJngP48P95SxS9ICeruBPnyDtZF2Ediqv4zXfGSjSiHtQg+CpFoRCF9VurNhjcp07JmWuMNqXlbv8DzBUSEzBV2HnvmmIl+L5tcB+ViSlnvR3GwSCs8Dj8TTs7M79vOPpXzu5sRETd9cXQRrTPGp7NCvXTeuRv3by4kMv2Eq9klfcu9satFLhbMA=="
+}

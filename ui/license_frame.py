@@ -2,8 +2,8 @@ from PyQt5.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
                            QLabel, QLineEdit, QComboBox, QDateEdit, QPushButton,
                            QScrollArea, QWidget, QGroupBox, QCheckBox, QTableWidgetItem,
                            QDialog, QTextEdit, QMessageBox, QStackedWidget, QFormLayout, QSpinBox,
-                           QFileDialog)
-from PyQt5.QtCore import Qt, QDate
+                           QFileDialog, QTableWidget)
+from PyQt5.QtCore import Qt, QDate, pyqtSlot
 from .dialogs.platform_select import PlatformSelectDialog
 from .dialogs.product_dialog import ProductDialog
 from core.product import Product
@@ -21,6 +21,7 @@ from .dialogs.credentials_dialog import CredentialsDialog
 from security.credentials_manager import CredentialsManager
 from utils.directory_manager import CustomerDirectoryManager
 from datetime import datetime, date
+from core.license_enforcer import LicenseEnforcer
 
 class LicenseType(Enum):
     SINGLE_USER = "Single-User License"
@@ -76,7 +77,7 @@ class FlexLMGenerator(BaseLicenseGenerator):
                     'name': product.name,
                     'version': product.version,
                     'quantity': product.quantity,
-                    'expiration': license_info['expiration_date'].isoformat()
+                    'expiration': license_info['expiration_date']
                 }
                 for product in products
             ]
@@ -147,6 +148,10 @@ class LicenseFrame(QFrame):
         self.validate_config(config)
         self.initialize_components(config)
         self.setup_ui()
+        self.server_connected = False
+        self.server_path = None
+        self.server_info = None
+        self.license_enforcer = LicenseEnforcer()
 
     def validate_config(self, config: Dict):
         """Validate configuration structure"""
@@ -186,6 +191,10 @@ class LicenseFrame(QFrame):
         """Initialize the license frame UI"""
         main_layout = QVBoxLayout(self)
         
+        # Add save location group
+        save_location_group = self.create_save_location_group()
+        main_layout.addWidget(save_location_group)
+        
         # Create scroll area for license details
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -206,6 +215,12 @@ class LicenseFrame(QFrame):
         # Product Settings Group
         product_group = self.create_product_group()
         content_layout.addWidget(product_group)
+        
+        # Active Licenses Table
+        self.active_licenses_table = QTableWidget()
+        self.active_licenses_table.setColumnCount(3)
+        self.active_licenses_table.setHorizontalHeaderLabels(['License ID', 'Type', 'Expiration'])
+        content_layout.addWidget(self.active_licenses_table)
         
         # Add scroll area to main layout
         main_layout.addWidget(scroll)
@@ -643,6 +658,12 @@ class LicenseFrame(QFrame):
     def save_license(self, license_data: str, license_system: str):
         """Save the license file with the appropriate extension"""
         try:
+            # Get the save path from the input field
+            save_path = Path(self.save_path_input.text())
+            
+            if not save_path.exists():
+                save_path.mkdir(parents=True, exist_ok=True)
+            
             customer_name = self.customer_name.text().strip()
             customer_id = self.customer_id.text().strip()
             
@@ -661,7 +682,8 @@ class LicenseFrame(QFrame):
             extensions = {
                 'flexlm': '.lic',
                 'hasp': '.v2c',
-                'sentinel': '.c2v'
+                'sentinel': '.c2v',
+                'mysql': '.sql'
             }
             extension = extensions.get(license_system, '.lic')
             
@@ -669,34 +691,21 @@ class LicenseFrame(QFrame):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"license_{timestamp}{extension}"
             
-            # Save to both local and server paths if server is configured
-            paths_to_save = [path]  # Start with local path
+            # Full path for the license file
+            license_path = path / filename
             
-            # Add server path if configured
-            if self.config.get('server', {}).get('path'):
-                server_base_path = Path(self.config['server']['path'])
-                server_path = server_base_path / customer_name / customer_id
-                server_path.mkdir(parents=True, exist_ok=True)
-                paths_to_save.append(server_path)
-            
-            # Save to all configured paths
-            for save_path in paths_to_save:
-                license_path = save_path / filename
-                
-                # Save based on license system type
-                if license_system == 'flexlm':
-                    # Save as text file
-                    with open(license_path, 'w') as f:
-                        f.write(license_data)
-                else:
-                    # Save as binary file for other formats
-                    with open(license_path, 'wb') as f:
-                        f.write(license_data)
+            # Save the license data
+            if isinstance(license_data, str):
+                with open(license_path, 'w', encoding='utf-8') as f:
+                    f.write(license_data)
+            else:
+                with open(license_path, 'wb') as f:
+                    f.write(license_data)
             
             QMessageBox.information(
                 self,
                 "Success",
-                f"License saved successfully to:\n" + "\n".join(str(p / filename) for p in paths_to_save)
+                f"License saved successfully to:\n{license_path}"
             )
             
         except Exception as e:
@@ -864,67 +873,6 @@ class LicenseFrame(QFrame):
                 f"Failed to create directory structure: {str(e)}"
             )
 
-    def save_license(self):
-        """Save the current license in the customer's directory"""
-        try:
-            customer_name = self.customer_name.text().strip()
-            customer_id = self.customer_id.text().strip()
-            
-            if not customer_name or not customer_id:
-                QMessageBox.warning(
-                    self,
-                    "Warning",
-                    "Please enter customer name and ID before saving."
-                )
-                return
-            
-            # Get or create the customer directory
-            path = self.dir_manager.create_customer_structure(customer_name, customer_id)
-            
-            # Get the license system type and determine file extension
-            license_system = self.license_system_combo.currentData()
-            if license_system == 'flexlm':
-                extension = '.lic'
-            elif license_system == 'hasp':
-                extension = '.v2c'
-            elif license_system == 'sentinel':
-                extension = '.c2v'
-            else:
-                extension = '.lic'  # Default to .lic if unknown
-            
-            # Generate filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"license_{timestamp}{extension}"
-            
-            # Full path for the license file
-            license_path = path / filename
-            
-            # Generate and save the license data
-            license_data = self.generate_license_data()
-            
-            # Save based on license system type
-            if license_system == 'flexlm':
-                # Save as text file
-                with open(license_path, 'w') as f:
-                    f.write(license_data)
-            else:
-                # Save as binary file for other formats if needed
-                with open(license_path, 'wb') as f:
-                    f.write(license_data)
-            
-            QMessageBox.information(
-                self,
-                "Success",
-                f"License saved successfully to:\n{license_path}"
-            )
-            
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Failed to save license: {str(e)}"
-            )
-
     def generate_license_data(self):
         """Generate license data with proper validation and error handling"""
         try:
@@ -967,8 +915,8 @@ class LicenseFrame(QFrame):
     def get_license_info(self) -> Dict:
         """Get license information from the form"""
         return {
-            'expiration_date': self.expiration_date.date().toPyDate(),  # Convert to Python date
-            'maintenance_date': self.maintenance_date.date().toPyDate(),  # Convert to Python date
+            'expiration_date': self.expiration_date.date().toPyDate().isoformat(),  # Convert to ISO string
+            'maintenance_date': self.maintenance_date.date().toPyDate().isoformat(),  # Convert to ISO string
             'license_type': self.license_type_combo.currentData().value,
             'platforms': getattr(self, 'selected_platforms', []),
             # Add any other license info fields
@@ -1063,6 +1011,138 @@ class LicenseFrame(QFrame):
             for system_id, system in self.config['license_systems'].items():
                 if system.get('enabled', True):
                     self.license_system_combo.addItem(system['name'], system_id)
+
+    def browse_save_location(self):
+        """Browse for save location, using server path if connected"""
+        try:
+            if self.server_connected:
+                # Start from server path
+                initial_path = self.server_path
+            else:
+                # Use local default path
+                initial_path = self.config.get('paths', {}).get('default_save_path', '')
+
+            # Show directory selection dialog
+            selected_path = QFileDialog.getExistingDirectory(
+                self,
+                "Select Save Location",
+                initial_path,
+                QFileDialog.ShowDirsOnly
+            )
+
+            if selected_path:
+                # Update the path display
+                self.save_path_input.setText(selected_path)
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to browse directories: {str(e)}"
+            )
+
+    def update_server_status(self, connected: bool, server_path: str = None):
+        """Update the server connection status and path"""
+        self.server_connected = connected
+        self.server_path = server_path
+        
+        if connected and server_path:
+            self.server_status_label.setText(f"Connected to: {server_path}")
+            self.server_status_label.setStyleSheet("color: green;")
+        else:
+            self.server_status_label.setText("Not connected to server")
+            self.server_status_label.setStyleSheet("color: gray;")
+
+    def create_save_location_group(self):
+        """Create the save location group with server status indicator"""
+        group = QGroupBox("Save Location")
+        layout = QVBoxLayout()  # Changed to QVBoxLayout for better organization
+        
+        # Add server status indicator
+        self.server_status_label = QLabel("Not connected to server")
+        self.server_status_label.setStyleSheet("color: gray;")
+        layout.addWidget(self.server_status_label)
+        
+        # Path selection layout
+        path_layout = QHBoxLayout()
+        self.save_path_input = QLineEdit()
+        self.save_path_input.setText(self.config.get('paths', {}).get('default_save_path', ''))
+        path_layout.addWidget(self.save_path_input)
+        
+        browse_button = QPushButton("Browse...")
+        browse_button.clicked.connect(self.browse_save_location)
+        path_layout.addWidget(browse_button)
+        
+        layout.addLayout(path_layout)
+        group.setLayout(layout)
+        return group
+
+    @pyqtSlot(dict)
+    def update_server_connection(self, server_info):
+        """Update the frame with server connection information"""
+        self.server_info = server_info
+        
+        if server_info and server_info.get('connected'):
+            # Update save location with server path
+            server_path = server_info.get('path', '')
+            self.save_path_input.setText(server_path)
+            self.save_path_input.setToolTip(f"Connected to: {server_path}")
+            self.save_path_input.setStyleSheet("QLineEdit { background-color: #e6ffe6; }")  # Light green background
+            
+            # Update server status in UI
+            self.update_server_status(True, server_path)
+            
+            # If the server provides license system information, update the combo
+            if 'license_systems' in server_info:
+                self.config['license_systems'].update(server_info['license_systems'])
+                self.populate_license_systems()
+            
+            # If the server provides product information, update the product list
+            if 'products' in server_info:
+                self.config['products'] = server_info['products']
+                self.refresh_product_list()
+                
+            QMessageBox.information(
+                self,
+                "Server Connected",
+                f"Successfully connected to server at:\n{server_path}"
+            )
+        else:
+            # Reset to local configuration
+            default_path = self.config.get('paths', {}).get('default_save_path', '')
+            self.save_path_input.setText(default_path)
+            self.save_path_input.setToolTip("Using local configuration")
+            self.save_path_input.setStyleSheet("")  # Reset style
+            
+            # Update server status
+            self.update_server_status(False)
+            
+            # Refresh with local configuration
+            self.populate_license_systems()
+            self.refresh_product_list()
+
+    def enforce_license(self, license_data: Dict):
+        """Enforce license using the LicenseEnforcer"""
+        success = self.license_enforcer.enforce_license(license_data)
+        if success:
+            self.update_active_licenses_table()  # Update the table with active licenses
+        else:
+            QMessageBox.critical(self, "License Error", 
+                                 "Failed to enforce license restrictions")
+        return success
+
+    def get_all_features(self) -> List:
+        """Get all features available in the application"""
+        # Implement logic to return all features
+        return []
+
+    def update_active_licenses_table(self):
+        """Update the table with active licenses"""
+        self.active_licenses_table.setRowCount(len(self.license_enforcer.active_licenses))
+        for row, license_data in enumerate(self.license_enforcer.active_licenses):
+            self.active_licenses_table.setItem(row, 0, QTableWidgetItem(license_data.get('id', '')))
+            self.active_licenses_table.setItem(row, 1, QTableWidgetItem(license_data.get('type', '')))
+            self.active_licenses_table.setItem(row, 2, QTableWidgetItem(license_data.get('expiration_date', '')))
 
 
 

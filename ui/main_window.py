@@ -392,4 +392,12 @@ class MainWindow(QMainWindow):
         guide = UserGuideDialog(self)
         guide.exec_()
 
+    def show_server_sync_dialog(self):
+        """Show the server sync dialog and update license frame if connected"""
+        dialog = ServerSyncDialog(self.config, self)
+        if dialog.exec_():
+            # Get the server status and update the license frame
+            connected, server_path = dialog.get_server_status()
+            self.license_frame.update_server_status(connected, server_path)
+
 

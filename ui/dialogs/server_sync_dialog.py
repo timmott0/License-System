@@ -8,6 +8,7 @@ class ServerSyncDialog(QDialog):
     def __init__(self, config, parent=None):
         super().__init__(parent)
         self.config = config
+        self.server_connected = False
         self.setWindowTitle("Sync Products")
         
         layout = QVBoxLayout(self)
@@ -54,26 +55,36 @@ class ServerSyncDialog(QDialog):
             if not server_path.exists():
                 raise FileNotFoundError("Server path does not exist")
             
-            # Try to list directory contents
-            list(server_path.iterdir())
+            # Try to list directory contents and store them
+            self.directory_contents = list(server_path.iterdir())
             
             # If successful, enable sync button and update status
             self.sync_button.setEnabled(True)
             self.status_label.setText("Connection successful! Ready to sync.")
             self.status_label.setStyleSheet("color: green")
             
-            # Save server path to config
+            # Save server path and update default paths in config
             if 'server' not in self.config:
                 self.config['server'] = {}
             self.config['server']['path'] = str(server_path)
+            self.config['server']['connected'] = True
+            self.config['paths']['default_save_path'] = str(server_path)
             
-            QMessageBox.information(self, "Success", "Successfully connected to server directory!")
+            self.server_connected = True
+            
+            QMessageBox.information(self, "Success", 
+                "Successfully connected to server directory!\nDefault save path updated to server location.")
             
         except Exception as e:
             self.sync_button.setEnabled(False)
             self.status_label.setText(f"Connection failed: {str(e)}")
             self.status_label.setStyleSheet("color: red")
+            self.server_connected = False
             QMessageBox.critical(self, "Error", f"Failed to connect to server: {str(e)}")
+
+    def get_server_status(self):
+        """Return the server connection status and path"""
+        return self.server_connected, self.server_path.text() if self.server_connected else None
 
     def sync_directories(self):
         """Sync local and server directories"""

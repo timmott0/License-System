@@ -1,0 +1,16 @@
+{
+    "key_settings": {
+        "key_length": 4096,
+        "key_format": "PKCS8",
+        "encryption_enabled": false,
+        "backup_enabled": true,
+        "backup_location": "config/keys/backup",
+        "rotation_period_days": 365,
+        "public_exponent": 65537
+    },
+    "validation": {
+        "enforce_key_length": true,
+        "minimum_key_length": 2048,
+        "require_password": false
+    }
+}

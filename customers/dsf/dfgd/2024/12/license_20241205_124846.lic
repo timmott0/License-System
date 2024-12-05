@@ -1,0 +1,34 @@
+{
+  "data": {
+    "type": "custom_server",
+    "customer": {
+      "name": "dsf",
+      "id": "dfgd",
+      "email": "fdgd@yahoo.comds"
+    },
+    "license": {
+      "expiration_date": "2025-12-05",
+      "maintenance_date": "2025-03-05",
+      "license_type": "Single-User License",
+      "platforms": [
+        "Windows"
+      ]
+    },
+    "products": [
+      {
+        "name": "sdf",
+        "version": "232",
+        "quantity": 1,
+        "features": [],
+        "expiration_date": null,
+        "maintenance_date": null
+      }
+    ],
+    "host": {
+      "hostid": "ANY",
+      "port": "27000"
+    },
+    "timestamp": "2024-12-05T17:48:46.953694"
+  },
+  "signature": "vJTevStlRCETET4+TLSkvnMysDMGb/pZRs72gbv6rG243ttCYWO16xFo+LbmVFadPQWrPuwvLsJ4ift8qu+EIqY2MwMpRVSc591TTBiJvLNC10goIK1/rYkYXialzi21joez98gc+7fWas8HamAmU83OC4CpgL1gtQv/7zypWtuE0P1ZOaRIMuTlj8xc+/j+WdtYyuFdXsaPlcTrYOeGRPyrRBNWyBtfaXd/jPf7c9yoJZ2jma0IBcsUpx+LsyoceIDORn+ifkv8xeZH9CKu0ZsijV86Q7KNbOo1LJw0bwwl3o7M1D/hK2ymwdRZYj34DbZrov7tuW5OZpak3es7Hg=="
+}
